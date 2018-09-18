@@ -48,8 +48,9 @@ active = tf.reciprocal(1.0 - tf.sqrt(eps) * z_)
 z_step = dt * (tf.multiply(z, a + b * z2 + d * eps * z4 / (1 - eps * z2)) + k * passive * active)
 step = z.assign(z + z_step)
 
-
-sess = tf.Session()
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
 r = []
@@ -64,4 +65,4 @@ plt.plot(sr)
 plt.subplot(1,2,2)
 ffsr = 1/sr.size * np.abs(np.fft.fft(sr)[1:sr.size//2])
 ffreq = np.fft.fftfreq(sr.size)[1:sr.size//2]
-plt.plot(ffreq, ffsr)
+plt.plot(ffreq, np.log(ffsr))
