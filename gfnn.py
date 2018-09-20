@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 Fs = 60.0
 dt = 1.0/Fs
-t = np.arange(0, 8, dt)
+t = np.arange(0, 20, dt)
 ff = 2
 sin = 0.25 * np.sin(t*2*np.pi*ff)
 #sin = np.concatenate([0.25 * np.sin(t[:t.size//2]*1*np.pi),  np.zeros(t.size//2)])
@@ -26,48 +26,49 @@ k = np.complex64(1.0 + 0j)
 c_init = 0.01 * np.ones([nosc, nosc], dtype=np.complex64)
 z_init = 0.01 * np.ones(nosc, dtype=np.complex64)
 
-x_in = tf.placeholder(tf.float32)
-z = tf.Variable(z_init)
-c = tf.Variable(c_init)
+with tf.device('/device:GPU:0'):
+    x_in = tf.placeholder(tf.float32)
+    z = tf.Variable(z_init)
+    c = tf.Variable(c_init)
 
-ints = tf.squeeze(tf.matmul(c, tf.expand_dims(z, axis=1)), axis=1)
-x = tf.complex(x_in, 0.0) + k * ints
+    ints = tf.squeeze(tf.matmul(c, tf.expand_dims(z, axis=1)), axis=1)
+    x = tf.complex(x_in, 0.0) + k * ints
 
-a = tf.complex(alpha, omega)
-b = tf.complex(beta1, delta1)
-d = tf.complex(beta2, delta2)
-z2 = tf.complex(tf.pow(tf.abs(z), 2), 0.0)
-z4 = tf.complex(tf.pow(tf.abs(z), 4), 0.0)
-z_ = tf.conj(z)
-passive = x * tf.reciprocal(1.0 - tf.sqrt(eps) * x)
-active = tf.reciprocal(1.0 - tf.sqrt(eps) * z_)
+    a = tf.complex(alpha, omega)
+    b = tf.complex(beta1, delta1)
+    d = tf.complex(beta2, delta2)
+    z2 = tf.complex(tf.pow(tf.abs(z), 2), 0.0)
+    z4 = tf.complex(tf.pow(tf.abs(z), 4), 0.0)
+    z_ = tf.conj(z)
+    passive = x * tf.reciprocal(1.0 - tf.sqrt(eps) * x)
+    active = tf.reciprocal(1.0 - tf.sqrt(eps) * z_)
 
-dzdt = dt * (tf.multiply(z, a + b * z2 + d * eps * z4 / (1 - eps * z2)) + passive * active)
-z_step = z.assign(z + dzdt)
-
-
-lamb = np.complex64(0.01 + 0j) #0.001
-mu1 = np.complex64(-1.0 + 0.0j) #-1.0
-mu2 = np.complex64(-50.0 + 0.0j) #-50.0
-epsc = np.complex64(1.0 + 0j)
-kc = np.complex64(1.0 + 0j)
-
-rm = tf.tile(tf.expand_dims(tf.range(nosc), axis=1), [1, nosc])
-
-def zfunc(zi, zj):
-    return zi * tf.reciprocal(1 - tf.sqrt(epsc) * zi) * zj * tf.reciprocal(1 - tf.sqrt(epsc) * tf.conj(zj)) \
-           * tf.reciprocal(1 - tf.sqrt(epsc) * zj)
+    dzdt = dt * (tf.multiply(z, a + b * z2 + d * eps * z4 / (1 - eps * z2)) + passive * active)
+    z_step = z.assign(z + dzdt)
 
 
-#fzz = tf.map_fn(lambda i: tf.map_fn(lambda j: zfunc(z[i], z[j]), tf.range(nosc), dtype=tf.complex64), tf.range(nosc), dtype=tf.complex64)
-fzz = tf.map_fn(lambda i: zfunc(z[i], z), tf.range(nosc), dtype=tf.complex64)
-dcdt = dt * (c * (lamb + mu1 * tf.complex(tf.pow(tf.abs(c), 2), 0.0) + tf.divide(epsc * mu2 * tf.complex(tf.pow(tf.abs(c), 4), 0.0),
-                                                                             1 - epsc * tf.complex(tf.pow(tf.abs(c), 2), 0.0))) + kc * fzz )
+    lamb = np.complex64(0.01 + 0j) #0.001
+    mu1 = np.complex64(-1.0 + 0.0j) #-1.0
+    mu2 = np.complex64(-50.0 + 0.0j) #-50.0
+    epsc = np.complex64(1.0 + 0j)
+    kc = np.complex64(1.0 + 0j)
 
-c_step = c.assign(c + dcdt)
+    rm = tf.tile(tf.expand_dims(tf.range(nosc), axis=1), [1, nosc])
+
+    def zfunc(zi, zj):
+        return zi * tf.reciprocal(1 - tf.sqrt(epsc) * zi) * zj * tf.reciprocal(1 - tf.sqrt(epsc) * tf.conj(zj)) \
+               * tf.reciprocal(1 - tf.sqrt(epsc) * zj)
 
 
-config = tf.ConfigProto()
+    #fzz = tf.map_fn(lambda i: tf.map_fn(lambda j: zfunc(z[i], z[j]), tf.range(nosc), dtype=tf.complex64), tf.range(nosc), dtype=tf.complex64)
+    fzz = tf.map_fn(lambda i: zfunc(z[i], z), tf.range(nosc), dtype=tf.complex64)
+    dcdt = dt * (c * (lamb + mu1 * tf.complex(tf.pow(tf.abs(c), 2), 0.0) + tf.divide(epsc * mu2 * tf.complex(tf.pow(tf.abs(c), 4), 0.0),
+                                                                                 1 - epsc * tf.complex(tf.pow(tf.abs(c), 2), 0.0))) + kc * fzz )
+
+    c_step = c.assign(c + dcdt)
+
+
+config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)
 config.gpu_options.allow_growth = True
 sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
