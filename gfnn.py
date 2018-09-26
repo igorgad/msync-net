@@ -23,10 +23,10 @@ delta2 = -9.0
 eps = np.complex64(1.0 + 0j)
 k = np.complex64(1.0 + 0j)
 
-c_init = 0.01 * np.ones([nosc, nosc], dtype=np.complex64)
-z_init = 0.01 * np.ones(nosc, dtype=np.complex64)
+c_init = 0.00 * np.ones([nosc, nosc], dtype=np.complex64)
+z_init = 0.00 * np.ones(nosc, dtype=np.complex64)
 
-with tf.device('/device:GPU:0'):
+with tf.device('/device:GPU:1'):
     x_in = tf.placeholder(tf.float32)
     z = tf.Variable(z_init)
     c = tf.Variable(c_init)
@@ -52,8 +52,6 @@ with tf.device('/device:GPU:0'):
     mu2 = np.complex64(-50.0 + 0.0j) #-50.0
     epsc = np.complex64(1.0 + 0j)
     kc = np.complex64(1.0 + 0j)
-
-    rm = tf.tile(tf.expand_dims(tf.range(nosc), axis=1), [1, nosc])
 
     def zfunc(zi, zj):
         return zi * tf.reciprocal(1 - tf.sqrt(epsc) * zi) * zj * tf.reciprocal(1 - tf.sqrt(epsc) * tf.conj(zj)) \
