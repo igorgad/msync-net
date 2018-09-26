@@ -25,9 +25,10 @@ class GFNNStateTuple(_GFNNStateTuple):
 class GFNNCell(tf.contrib.rnn.RNNCell):
     """A GFNN implemented in the form of a RNN Cell."""
 
-    def __init__(self, num_osc, dt, osc_params=None, heb_params=None):
+    def __init__(self, num_osc, dt, osc_params=None, use_hebbian_learning=False, heb_params=None):
         self._num_osc = num_osc
         self._dt = dt
+        self._use_hebbian_learning = use_hebbian_learning
 
         if osc_params is not None:
             self._osc_params = osc_params
@@ -91,21 +92,22 @@ class GFNNCell(tf.contrib.rnn.RNNCell):
             dzdt = self._dt * (z * (self._a + self._b * z2 + self._d * self._osc_params['eps'] * z4
                                     / (1 - self._osc_params['eps'] * z2)) + passive * active)
             new_z = z + dzdt
+            new_c = tf.reshape(c, [-1, self._num_osc * self._num_osc])
 
             # Connectivity Matrix Update Rule (Hebbian learning)
-            c2 = tf.complex(tf.pow(tf.abs(c), 2), 0.0)
-            c4 = tf.complex(tf.pow(tf.abs(c), 4), 0.0)
+            if self._use_hebbian_learning:
+                c2 = tf.complex(tf.pow(tf.abs(c), 2), 0.0)
+                c4 = tf.complex(tf.pow(tf.abs(c), 4), 0.0)
 
-            def zmul(zi, zj):
-                return zi * tf.reciprocal(1 - tf.sqrt(self._heb_params['eps']) * zi) * zj \
-                       * tf.reciprocal(1 - tf.sqrt(self._heb_params['eps']) * tf.conj(zj)) \
-                       * tf.reciprocal(1 - tf.sqrt(self._heb_params['eps']) * zj)
+                def zmul(zi, zj):
+                    return zi * tf.reciprocal(1 - tf.sqrt(self._heb_params['eps']) * zi) * zj \
+                           * tf.reciprocal(1 - tf.sqrt(self._heb_params['eps']) * tf.conj(zj)) \
+                           * tf.reciprocal(1 - tf.sqrt(self._heb_params['eps']) * zj)
 
-            fz = tf.transpose(tf.map_fn(lambda i: zmul(tf.expand_dims(z[:,i], axis=-1), z), tf.range(self._num_osc), dtype=tf.complex64), [1, 0, 2])
-            dcdt = self._dt * (c * (self._heb_params['lamb'] + self._heb_params['mu1'] * c2 + self._heb_params['eps']
-                                    * self._heb_params['mu2'] * c4 / (1 - self._heb_params['eps'] * c2))
-                              + self._heb_params['k'] * fz)
-            new_c = tf.reshape(c + dcdt, [-1, self._num_osc * self._num_osc])
+                fz = tf.transpose(tf.map_fn(lambda i: zmul(tf.expand_dims(z[:,i], axis=-1), z), tf.range(self._num_osc), dtype=tf.complex64), [1, 0, 2])
+                dcdt = self._dt * (c * (self._heb_params['lamb'] + self._heb_params['mu1'] * c2 + self._heb_params['eps']
+                                        * self._heb_params['mu2'] * c4 / (1 - self._heb_params['eps'] * c2)) + self._heb_params['k'] * fz)
+                new_c = tf.reshape(c + dcdt, [-1, self._num_osc * self._num_osc])
 
             # Update State Tuple
             new_state = GFNNStateTuple(new_z, new_c)
