@@ -34,7 +34,7 @@ class GFNNCell(tf.contrib.rnn.RNNCell):
             self._osc_params = osc_params
         else:
             self._osc_params = {'omega': 2 * np.pi * np.logspace(0, 1, self._num_osc, dtype=np.float32) / 10,
-                                'alpha': -0.5 * np.ones(self._num_osc, np.float32),
+                                'alpha': -1.0 * np.ones(self._num_osc, np.float32),
                                 'beta1': -10.0,
                                 'beta2': -9.0,
                                 'delta1': -10.0,
