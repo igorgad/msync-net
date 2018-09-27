@@ -36,11 +36,11 @@ class GFNNCell(tf.contrib.rnn.RNNCell):
             self._osc_params = {'omega': 2 * np.pi * np.logspace(0, 1, self._num_osc, dtype=np.float32) / 10,
                                 'alpha': -0.5 * np.ones(self._num_osc, np.float32),
                                 'beta1': -1.0,
-                                'beta2': -50.0,
-                                'delta1': -50.0,
-                                'delta2': -50.0,
-                                'eps': 0.5,
-                                'k': 0.0}
+                                'beta2': -1.0,
+                                'delta1': 0.0,
+                                'delta2': 0.0,
+                                'eps': 1.0,
+                                'k': 1.0}
 
         self._a = tf.complex(self._osc_params['alpha'], self._osc_params['omega'])
         self._b = tf.complex(self._osc_params['beta1'], self._osc_params['delta1'])
@@ -51,9 +51,9 @@ class GFNNCell(tf.contrib.rnn.RNNCell):
         if heb_params is not None:
             self._heb_params = heb_params
         else:
-            self._heb_params = {'lamb': 0.01,
+            self._heb_params = {'lamb': 0.5,
                                 'mu1': -1.0,
-                                'mu2': -50.0,
+                                'mu2': -10.0,
                                 'eps': 1.0,
                                 'k': 1.0}
 
