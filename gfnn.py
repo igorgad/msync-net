@@ -8,13 +8,13 @@ import matplotlib.pyplot as plt
 
 Fs = 60.0
 dt = 1.0/Fs
-t = np.arange(0, 20, dt)
-ff = 1.5
+t = np.arange(0, 8, dt)
+ff = 6
 sin = 0.7 * np.exp(1j * 2 * np.pi * ff * t)
 #sin = np.concatenate([0.25 * np.sin(t[:t.size//2]*1*np.pi),  np.zeros(t.size//2)])
 
 nosc = 128
-fmin = 0.5
+fmin = 0.125
 fmax = 8.0
 f = np.logspace(np.log10(fmin), np.log10(fmax), nosc, dtype=np.float32)
 w = 2 * np.pi * f
@@ -27,7 +27,7 @@ delta2 = 0.0
 eps = np.complex64(1.0)
 k = np.complex64(0.0)
 
-lamb = np.complex64(0.001 + 0j) #0.001
+lamb = np.complex64(0.1 + 0j) #0.001
 mu1 = np.complex64(-1.0 + 0.0j) #-1.0
 mu2 = np.complex64(-50.0 + 0.0j) #-50.0
 epsc = np.complex64(1.0 + 0j)
@@ -66,19 +66,19 @@ with tf.device('/device:GPU:0'):
     z_step = z.assign((z + dzdt))
 
     #######################################################
-    # def zfunc(zi, zj):
-    #     return zi * tf.reciprocal(1 - tf.sqrt(epsc) * zi) * zj * tf.reciprocal(1 - tf.sqrt(epsc) * tf.conj(zj)) \
-    #            * tf.reciprocal(1 - tf.sqrt(epsc) * zj)
-    #
-    #
-    # #fzz = tf.map_fn(lambda i: tf.map_fn(lambda j: zfunc(z[i], z[j]), tf.range(nosc), dtype=tf.complex64), tf.range(nosc), dtype=tf.complex64)
-    # fzz = tf.map_fn(lambda i: zfunc(z[i], z), tf.range(nosc), dtype=tf.complex64)
-    # dcdt = dt * (c * (lamb + mu1 * tf.complex(tf.pow(tf.abs(c), 2), 0.0) + tf.divide(epsc * mu2 * tf.complex(tf.pow(tf.abs(c), 4), 0.0),
-    #                                                                              1 - epsc * tf.complex(tf.pow(tf.abs(c), 2), 0.0))) + kc * fzz * f )
-    #
-    # dcdt = tf.where(tf.is_nan(tf.real(dcdt)), tf.zeros_like(dcdt), dcdt)
-    # dcdt = tf.where(tf.is_inf(tf.real(dcdt)), tf.ones_like(dcdt), dcdt)
-    # c_step = c.assign(c + dcdt)
+    def zfunc(zi, zj):
+        return zi * tf.reciprocal(1 - tf.sqrt(epsc) * zi) * zj * tf.reciprocal(1 - tf.sqrt(epsc) * tf.conj(zj)) \
+               * tf.reciprocal(1 - tf.sqrt(epsc) * zj)
+
+
+    #fzz = tf.map_fn(lambda i: tf.map_fn(lambda j: zfunc(z[i], z[j]), tf.range(nosc), dtype=tf.complex64), tf.range(nosc), dtype=tf.complex64)
+    fzz = f * tf.map_fn(lambda i: zfunc(z[i], z), tf.range(nosc), dtype=tf.complex64)
+    dcdt = dt * (c * (lamb + mu1 * tf.complex(tf.pow(tf.abs(c), 2), 0.0) + tf.divide(epsc * mu2 * tf.complex(tf.pow(tf.abs(c), 4), 0.0),
+                                                                                 1 - epsc * tf.complex(tf.pow(tf.abs(c), 2), 0.0))) + kc * fzz )
+
+    dcdt = tf.where(tf.is_nan(tf.real(dcdt)), tf.zeros_like(dcdt), dcdt)
+    dcdt = tf.where(tf.is_inf(tf.real(dcdt)), tf.ones_like(dcdt), dcdt)
+    c_step = c.assign(c + dcdt)
 
 config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)
 config.gpu_options.allow_growth = True
@@ -93,7 +93,7 @@ for i in sin:
     r.append(sess.run(z_step, {x_in: i}))
     pp.append(sess.run(passive, {x_in: i}))
     aa.append(sess.run(active, {x_in: i}))
-    # cr.append(sess.run(c_step, {x_in: i}))
+    cr.append(sess.run(c_step, {x_in: i}))
 
 
 sr = np.array(r)

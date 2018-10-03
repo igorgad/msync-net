@@ -15,15 +15,15 @@ class GFNN():
         if osc_params is not None:
             self._osc_params = osc_params
         else:
-            self._osc_params = {'f_min': 0.5,
+            self._osc_params = {'f_min': 0.125,
                                 'f_max': 8.0,
                                 'alpha': 0.0,
-                                'beta1': -50.0,
+                                'beta1': -1.0,
                                 'beta2': 0.0,
                                 'delta1': 0.0,
                                 'delta2': 0.0,
                                 'eps': 1.0,
-                                'k': 0.0}
+                                'k': 1.0}
 
         self._f = np.logspace(np.log10(self._osc_params['f_min']), np.log10(self._osc_params['f_max']), self._num_osc, dtype=np.float32)
         self._osc_params['alpha'] = self._osc_params['alpha'] * np.ones(self._num_osc, np.float32)
@@ -32,15 +32,15 @@ class GFNN():
         self._d = tf.complex(self._osc_params['beta2'], self._osc_params['delta2']) * self._f
         self._e = np.complex64(self._osc_params['eps'])
         self._sqe = np.sqrt(self._e)
-        self._k = np.complex64(self._osc_params['k'])
+        self._k = np.complex64(self._osc_params['k'] + 1j * self._osc_params['k'])
 
         if heb_params is not None:
             self._heb_params = heb_params
         else:
-            self._heb_params = {'lamb': 0.1,
+            self._heb_params = {'lamb': 0.001,
                                 'mu1': -1.0,
                                 'mu2': -50.0,
-                                'eps': 1.0,
+                                'eps': 16.0,
                                 'k': 1.0}
 
         self._lamb = np.complex64(self._heb_params['lamb'])
@@ -48,7 +48,7 @@ class GFNN():
         self._mu2 = np.complex64(self._heb_params['mu2'])
         self._ec = np.complex64(self._heb_params['eps'])
         self._sqec = np.sqrt(self._ec)
-        self._kc = np.complex64(self._heb_params['k'])
+        self._kc = np.complex64(self._heb_params['k'] + 1j * self._heb_params['k'])
         self._c_limit = np.abs(1 / self._sqec)
 
     def noisy_zero_state(self, batch_size):
@@ -75,7 +75,7 @@ class GFNN():
         c_zero_diag = tf.matrix_set_diag(c, tf.zeros([tf.shape(c)[0], self._num_osc], dtype=tf.complex64))
 
         # Calculate input with Connections with x(t)
-        x = tf.expand_dims(tf.gather(input, ti, axis=-1), axis=-1) + tf.squeeze(tf.matmul(c_zero_diag, tf.expand_dims(z, axis=-1)), axis=-1)
+        x = tf.expand_dims(tf.gather(input, ti, axis=-1), axis=-1) + 0.0 * tf.squeeze(tf.matmul(c_zero_diag, tf.expand_dims(z, axis=-1)), axis=-1)
 
         # Oscillators Update Rule
         z2 = tf.complex(tf.pow(tf.abs(z), 2), 0.0)
@@ -84,7 +84,7 @@ class GFNN():
         passive = tf.divide(x, 1.0 - self._sqe * x)
         active = tf.reciprocal(1.0 - self._sqe * z_)
 
-        dzdt = z * (self._a + self._b * z2 + self._d * self._e * z4 / (1 - self._e * z2)) + passive * active * self._f
+        dzdt = z * (self._a + self._b * z2 + self._d * self._e * z4 / (1 - self._e * z2)) + self._k * passive * active * self._f
         dcdt = c
 
         # Connectivity Update Rule
@@ -93,14 +93,14 @@ class GFNN():
             c4 = tf.complex(tf.pow(tf.abs(c), 4), 0.0)
 
             def zmul(zi, zj):
-                return tf.divide(zi, 1 - self._sqec * zi) * tf.divide(zj, 1 - self._sqec * tf.conj(zj)) * tf.reciprocal(
-                    1 - self._sqec * zj)
+                return tf.divide(zi, 1 - self._sqec * zi) * tf.divide(zj, 1 - self._sqec * tf.conj(zj)) * tf.reciprocal(1 - self._sqec * zj)
 
             fz = tf.transpose(tf.map_fn(lambda i: zmul(tf.expand_dims(z[:, i], axis=-1), z), tf.range(self._num_osc), dtype=tf.complex64, parallel_iterations=128), [1, 0, 2])
+            fz = tf.matrix_set_diag(fz, tf.zeros([tf.shape(fz)[0], self._num_osc], dtype=tf.complex64))
             dcdt = c * (self._lamb + self._mu1 * c2 + self._ec * self._mu2 * c4 / (1 - self._ec * c2)) + self._kc * fz
 
             if self._avoid_nan:
-                dzdt = tf.where(tf.is_nan(tf.real(dzdt)), tf.zeros_like(dzdt), dzdt)
+                # dzdt = tf.where(tf.is_nan(tf.real(dzdt)), tf.zeros_like(dzdt), dzdt)
                 dcdt = tf.where(tf.is_nan(tf.real(dcdt)), tf.zeros_like(dcdt), dcdt)
                 dcdt = tf.where(tf.is_inf(tf.real(dcdt)), self._c_limit * tf.ones_like(dcdt), dcdt)
 
