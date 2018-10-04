@@ -12,13 +12,13 @@ importlib.reload(GFNN)
 
 # Params
 downsample_rate = 4
-nosc = 128
+nosc = 180
 batch_size = 1
 boff = 100
 Fs = 44100.0 / downsample_rate
 dt = 1.0/Fs
 audio_file = '/media/igor/DATA/Dataset/Audio/AClassicEducation_NightOwl_STEMS/AClassicEducation_NightOwl_STEM_05.wav'
-samples_length = 1024 * 12
+samples_length = 1024 * 8
 
 # Load Audio
 audio_binary = tf.read_file(audio_file)
@@ -30,7 +30,7 @@ waveform = tf.contrib.signal.frame(waveform, samples_length, samples_length)
 sin = tf.complex(waveform[boff:boff+batch_size, :], 0.0)
 
 with tf.device('/device:GPU:1'):
-    gfnn = GFNN.GFNN(nosc, dt, use_hebbian_learning=False, avoid_nan=False)
+    gfnn = GFNN.GFNN(nosc, dt, use_hebbian_learning=True, scale_connections=True)
     z_state, c_state = gfnn.gfnn(sin)
 
 config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)
