@@ -17,7 +17,8 @@ batch_size = 1
 boff = 100
 Fs = 44100.0 / downsample_rate
 dt = 1.0/Fs
-audio_file = '/media/igor/DATA/Dataset/Audio/AClassicEducation_NightOwl_STEMS/AClassicEducation_NightOwl_STEM_05.wav'
+# audio_file = '/media/igor/DATA/Dataset/Audio/AClassicEducation_NightOwl_STEMS/AClassicEducation_NightOwl_STEM_05.wav'
+audio_file = '/home/pepeu/workspace/Dataset/Audio/AClassicEducation_NightOwl_STEMS/AClassicEducation_NightOwl_STEM_05.wav'
 samples_length = 1024 * 8
 
 # Load Audio
@@ -30,8 +31,8 @@ waveform = tf.contrib.signal.frame(waveform, samples_length, samples_length)
 sin = tf.complex(waveform[boff:boff+batch_size, :], 0.0)
 
 with tf.device('/device:GPU:1'):
-    gfnn = GFNN.GFNN(nosc, dt, use_hebbian_learning=True, scale_connections=True)
-    z_state, c_state = gfnn.gfnn(sin)
+    gfnn = GFNN.GFNN(nosc, dt, use_hebbian_learning=False)
+    z_state, c_state = gfnn.run(sin)
 
 config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)
 config.gpu_options.allow_growth = True
@@ -51,17 +52,17 @@ fig, [ax1, ax2, ax3, ax4] = plt.subplots(4, figsize=(14, 8))
 ax1.plot(in_stim)
 ax1.set_title('Input Stimulus')
 
-ax2.imshow(np.abs(sz[sb, :, :]).T, cmap='gray')
+ax2.imshow(np.abs(sz[sb, :, :]), cmap='gray')
 ax2.set_yticks(xticks)
 ax2.set_yticklabels(xlabels)
 ax2.set_title('Oscillators Amplitude Response')
 
-ax3.imshow(np.real(sz[sb, :, :]).T, cmap='gray')
+ax3.imshow(np.real(sz[sb, :, :]), cmap='gray')
 ax3.set_yticks(xticks)
 ax3.set_yticklabels(xlabels)
 ax3.set_title('Oscillators Phase Response')
 
-ax4.plot(np.abs(sz[sb, -200:, :]).mean(0))
+ax4.plot(np.abs(sz[sb, :, -200:]).mean(0))
 ax4.set_xticks(xticks)
 ax4.set_xticklabels(xlabels)
 ax4.set_title('Average Absolute Response')
