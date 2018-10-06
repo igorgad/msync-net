@@ -18,7 +18,7 @@ sin = np.complex64(0.2 * np.exp(1j * 2 * np.pi * ff * t))
 sin = np.repeat(np.expand_dims(sin, 0),  batch_size, axis=0)
 
 with tf.device('/device:GPU:0'):
-    gfnn = GFNN.GFNN(nosc, dt, use_hebbian_learning=True)
+    gfnn = GFNN.GFNN(nosc, dt, use_hebbian_learning=False)
     z_state, c_state = gfnn.run(sin)
 
 config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)
@@ -48,17 +48,16 @@ ax3.set_xticklabels(xlabels)
 
 if gfnn._use_hebbian_learning:
     fig2, [ax1f2, ax2f2] = plt.subplots(1, 2, figsize=(14, 8))
-    for i in range(sc.shape[1]):
-        ax1f2.imshow(np.real(sc[0, :, :, i]).T, cmap='gray')
-        ax1f2.set_xticks(xticks)
-        ax1f2.set_xticklabels(xlabels)
-        ax1f2.set_yticks(xticks)
-        ax1f2.set_yticklabels(xlabels)
 
-        ax2f2.imshow(np.angle(sc[0, :, :, i]).T, cmap='gray')
-        ax2f2.set_xticks(xticks)
-        ax2f2.set_xticklabels(xlabels)
-        ax2f2.set_yticks(xticks)
-        ax2f2.set_yticklabels(xlabels)
+    ax1f2.imshow(np.real(sc[0, :, :]), cmap='gray')
+    ax1f2.set_xticks(xticks)
+    ax1f2.set_xticklabels(xlabels)
+    ax1f2.set_yticks(xticks)
+    ax1f2.set_yticklabels(xlabels)
 
-        plt.pause(0.5)
+    ax2f2.imshow(np.angle(sc[0, :, :]), cmap='gray')
+    ax2f2.set_xticks(xticks)
+    ax2f2.set_xticklabels(xlabels)
+    ax2f2.set_yticks(xticks)
+    ax2f2.set_yticklabels(xlabels)
+

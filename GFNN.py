@@ -89,7 +89,6 @@ class GFNN:
         return dcdt
 
     def _zdot(self, external_stimulus, state, ti):
-        # Extract z and c states
         z = state
         x = tf.expand_dims(tf.gather(external_stimulus, ti, axis=-1), axis=-1)
 
@@ -125,7 +124,7 @@ class GFNN:
         if self._use_hebbian_learning:
             c_state = tf.contrib.integrate.odeint_fixed(lambda s, t: self._cdot(z_state, s, tf.cast(t // dt, tf.int32)), self._c_state, t, dt, method='rk4')
             c_state = tf.transpose(c_state, [1, 2, 3, 0])
-            self._c_state = c_state[:, :, :, -1] # Update internal state with latest c_state
+            self._c_state = c_state[:, :, :, -1]  # Update internal state with latest c_state
 
         return z_state, self._c_state
 
