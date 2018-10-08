@@ -1,6 +1,4 @@
-
-
-import GFNN
+from models import GFNN
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt

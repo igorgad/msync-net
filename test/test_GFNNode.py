@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
-import GFNN
+from models import GFNN
 import matplotlib.pyplot as plt
 import importlib
 importlib.reload(GFNN)

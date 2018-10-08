@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
-import GFNN
+from models import GFNN
 import matplotlib.pyplot as plt
 import importlib
 importlib.reload(GFNN)
@@ -14,7 +14,9 @@ dt = 1.0/Fs
 t = np.arange(0, 20, dt)
 ff = 1.0 # 2.095676
 # sin = np.float32(0.2 * np.sin(2 * np.pi * ff * t))
-sin = np.complex64(0.2 * np.exp(1j * 2 * np.pi * ff * t))
+sin1 = np.complex64(0.2 * np.exp(1j * 2 * np.pi * ff * t[:t.size//2]))
+sin0 = np.complex64(0.2 * np.exp(1j * 2 * np.pi * 2.0 * t[t.size//2:]))
+sin = np.concatenate([sin1, sin0], axis=0)
 sin = np.repeat(np.expand_dims(sin, 0),  batch_size, axis=0)
 
 inputs = tf.keras.Input((sin.shape[1],), dtype=tf.complex64)

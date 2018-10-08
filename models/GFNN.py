@@ -53,15 +53,6 @@ class GFNN:
         self._kc = np.complex64(self._heb_params['k'] + 1j * self._heb_params['k'])
         self._c_limit = np.abs(1 / self._sqec)
 
-    def _initialize_states_with_noise(self, batch_size):
-        rz = 0.01 * tf.random_normal([batch_size, self._num_osc], dtype=tf.float32)
-        phiz = 0.01 * 2 * np.pi * tf.random_normal([batch_size, self._num_osc], dtype=tf.float32)
-        self._z_state = tf.complex(rz, phiz)
-        if self._use_hebbian_learning:
-            rc = 0.01 * tf.random_normal([batch_size, self._num_osc, self._num_osc], dtype=tf.float32)
-            phic = 0.01 * 2 * np.pi * tf.random_normal([batch_size, self._num_osc, self._num_osc], dtype=tf.float32)
-            self._c_state = tf.complex(rc, phic)
-
     def _initialize_states_with_zeros(self, batch_size):
         z_init = tf.zeros([batch_size, self._num_osc], dtype=tf.complex64)
         self._z_state = z_init

@@ -1,5 +1,4 @@
-
-import GFNNCell
+from test import GFNNCell
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
