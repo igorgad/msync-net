@@ -20,16 +20,32 @@ def parse_features_and_decode(tf_example):
 
 def load_audio(parsed_features, data_params):
     def load_file(file):
-        audio_binary = tf.read_file(os.fsencode(data_params['dataset_root']) + b'/' + parsed_features['folder'] + b'/' + file)
+        audio_binary = tf.read_file(os.fsencode(data_params['audio_root']) + b'/' + parsed_features['folder'] + b'/' + file)
         smp = tf.contrib.ffmpeg.decode_audio(audio_binary, file_format='wav', samples_per_second=data_params['sample_rate'], channel_count=1)
         return smp
 
-    parsed_features['samples'] = tf.map_fn(load_file, parsed_features['files'], dtype=tf.float32, infer_shape=False)
+    parsed_features['signals'] = tf.map_fn(load_file, parsed_features['files'], dtype=tf.float32, infer_shape=False)
     return parsed_features
+
+
+def frame_signals(parsed_features, data_params):
+    def frame_signal(signal):
+        return tf.contrib.signal.frame(signal[:, 0], data_params['frame_length'], data_params['frame_step'])
+
+    parsed_features['framed_signals'] = tf.map_fn(frame_signal, parsed_features['signals'], dtype=tf.float32, infer_shape=False)
+    return parsed_features
+
+
+def prepare_examples(parsed_features):
+    data = [parsed_features['framed_signals'][0, :10, :], parsed_features['framed_signals'][1, :10, :]]
+    labels = tf.zeros_like(parsed_features['framed_signals'][0, :10, :])
+    return data, labels
 
 
 def pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
-    return tfdataset.make_one_shot_iterator().get_next()
+    tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params))
+    tfdataset = tfdataset.map(prepare_examples).batch(data_params['batch_size'])
+    return tfdataset

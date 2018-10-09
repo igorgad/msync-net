@@ -18,7 +18,7 @@ class GFNN:
         else:
             self._osc_params = {'f_min': 0.125,
                                 'f_max': 8.0,
-                                'alpha': 0.0,
+                                'alpha': -1.0,
                                 'beta1': -1.0,
                                 'beta2': 0.0,
                                 'delta1': 0.0,
@@ -109,8 +109,8 @@ class GFNN:
 
         z_state = tf.contrib.integrate.odeint_fixed(lambda s, t: self._zdot(ext_input, s, tf.cast(t // dt, tf.int32)),
                                                     self._z_state, t, dt, method='rk4')
-        z_state = tf.transpose(z_state, [1, 2, 0])
-        self._z_state = z_state[:, :, -1]  # Update internal state with latest z_state
+        z_state = tf.transpose(z_state, [1, 0, 2])  # [batch, input_size, nosc]
+        self._z_state = z_state[:, -1, :]  # Update internal state with latest z_state
 
         if self._use_hebbian_learning:
             c_state = tf.contrib.integrate.odeint_fixed(lambda s, t: self._cdot(z_state, s, tf.cast(t // dt, tf.int32)), self._c_state, t, dt, method='rk4')
@@ -123,9 +123,9 @@ class GFNN:
 class KerasLayer(tf.keras.layers.Layer):
     def __init__(self, num_osc, dt,
                  input_normalization=False, input_normalization_max_val=0.25,
-                 osc_params=None, use_hebbian_learning=False, heb_params=None):
+                 osc_params=None, use_hebbian_learning=False, heb_params=None, **kwargs):
 
-        super(KerasLayer, self).__init__()
+        super(KerasLayer, self).__init__(**kwargs)
         self.input_normalization = input_normalization
         self.input_normalization_max_val = input_normalization_max_val
         self.gfnn = GFNN(num_osc, dt, osc_params, use_hebbian_learning, heb_params)
@@ -148,4 +148,4 @@ class KerasLayer(tf.keras.layers.Layer):
         super(KerasLayer, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return input_shape[0], self.gfnn._num_osc, input_shape[-1]
+        return input_shape[0],  input_shape[-1], self.gfnn._num_osc
