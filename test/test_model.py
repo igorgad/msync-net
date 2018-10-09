@@ -2,16 +2,17 @@
 
 import tensorflow as tf
 import numpy as np
-from models import GFNN
+from models import simple_gfnn
 from models import loss
 import matplotlib.pyplot as plt
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 import importlib
-importlib.reload(GFNN)
+importlib.reload(simple_gfnn)
+importlib.reload(loss)
 
 nosc = 180
-batch_size = 512
+batch_size = 128
 Fs = 60.0
 dt = 1.0/Fs
 t = np.arange(0, 20, dt)
@@ -38,20 +39,5 @@ model_params = {'num_osc': nosc,
                 'lr': 0.01
                 }
 
-gfnn1 = GFNN.KerasLayer(model_params['num_osc'], model_params['dt'], input_shape=model_params['input_shape'])
-model1 = tf.keras.Sequential()
-model1.add(gfnn1)
-model1.add(tf.keras.layers.LSTM(model_params['outdim_size']))
-
-gfnn2 = GFNN.KerasLayer(model_params['num_osc'], model_params['dt'], input_shape=model_params['input_shape'])
-model2 = tf.keras.Sequential()
-model2.add(gfnn1)
-model2.add(tf.keras.layers.LSTM(model_params['outdim_size']))
-
-model = tf.keras.Sequential()
-model.add(tf.keras.layers.concatenate([model1, model2]))
-
-model_optimizer = tf.keras.optimizers.RMSprop(lr=model_params['lr'])
-model.compile(loss=loss.cca_loss, optimizer=model_optimizer)
-
-model.fit(sin, sin)
+model = simple_gfnn.simple_gfnn_cca_v0(model_params)
+model.fit([sin, sin], sin, epochs=10)
