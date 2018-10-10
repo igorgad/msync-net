@@ -37,9 +37,10 @@ def frame_signals(parsed_features, data_params):
 
 
 def prepare_examples(parsed_features):
-    data = [parsed_features['framed_signals'][0, :10, :], parsed_features['framed_signals'][1, :10, :]]
-    labels = tf.zeros_like(parsed_features['framed_signals'][0, :10, :])
-    return data, labels
+    data = (parsed_features['framed_signals'][0], parsed_features['framed_signals'][1])
+    labels = tf.zeros_like(parsed_features['framed_signals'][0])
+    example = data, labels
+    return example
 
 
 def pipeline(data_params):
@@ -47,5 +48,5 @@ def pipeline(data_params):
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params))
-    tfdataset = tfdataset.map(prepare_examples).batch(data_params['batch_size'])
+    tfdataset = tfdataset.map(prepare_examples)
     return tfdataset

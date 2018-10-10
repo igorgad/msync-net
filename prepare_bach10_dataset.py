@@ -6,7 +6,7 @@ import os
 
 max_samples_delay = 1024
 block_size = 2048
-data_root = '/media/igor/DATA/Dataset/BACH10/'
+data_root = '/home/pepeu/workspace/Dataset/BACH10/'
 audio_dir = data_root + '/Audio/'
 tfrecordfile = data_root + 'msync-bach10.tfrecord'
 train_test_ratio = 0.8

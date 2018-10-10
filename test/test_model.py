@@ -6,7 +6,7 @@ from models import simple_gfnn
 from models import loss
 import matplotlib.pyplot as plt
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import importlib
 importlib.reload(simple_gfnn)
 importlib.reload(loss)
