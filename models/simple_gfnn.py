@@ -24,5 +24,6 @@ def build_single_branch(model_params):
 
     input = tf.keras.Input(model_params['input_shape'])
     output = gfnn(input)
+    tf.summary.image('gfnn-out', output)
     output = tf.keras.layers.LSTM(model_params['outdim_size'])(output)
     return input, output

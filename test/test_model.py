@@ -39,5 +39,6 @@ model_params = {'num_osc': nosc,
                 'lr': 0.01
                 }
 
+callback_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs', batch_size=batch_size, write_images=True)
 model = simple_gfnn.simple_gfnn_cca_v0(model_params)
-model.fit([sin, sin], sin, epochs=10)
+model.fit([sin, sin], sin, validation_data=[[sin, sin], sin], validation_steps=1, epochs=2, steps_per_epoch=1, callbacks=[callback_tb])
