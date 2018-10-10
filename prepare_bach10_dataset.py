@@ -4,24 +4,22 @@ import numpy as np
 import os
 
 
-max_samples_delay = 1024
-block_size = 2048
-data_root = '/home/pepeu/workspace/Dataset/BACH10/'
+data_root = './data/BACH10/'
 audio_dir = data_root + '/Audio/'
 tfrecordfile = data_root + 'msync-bach10.tfrecord'
 train_test_ratio = 0.8
 
 
 def int64_feature(value):
-  return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
 def floats_feature(value):
-  return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
+    return tf.train.Feature(float_list=tf.train.FloatList(value=[value]))
 
 
 def bytes_feature(value):
-  return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
 
 
 np.random.seed(0)

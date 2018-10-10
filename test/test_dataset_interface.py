@@ -7,8 +7,8 @@ import importlib
 importlib.reload(dataset_interface)
 
 
-data_params = {'dataset_file': '/home/pepeu/workspace/Dataset/BACH10/msync-bach10.tfrecord',
-               'audio_root': '/home/pepeu/workspace/Dataset/BACH10/Audio',
+data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
+               'audio_root': './data/BACH10/Audio',
                'sample_rate': 44100//4,
                'frame_length': 2048,
                'frame_step': 1024
