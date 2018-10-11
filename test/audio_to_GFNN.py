@@ -1,4 +1,4 @@
-from models import GFNN
+from msync import GFNN
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt

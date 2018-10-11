@@ -7,7 +7,7 @@ import importlib
 importlib.reload(dataset_interface)
 
 
-data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
+data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 44100//4,
                'frame_length': 2048,

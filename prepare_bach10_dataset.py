@@ -6,7 +6,7 @@ import os
 
 data_root = './data/BACH10/'
 audio_dir = data_root + '/Audio/'
-tfrecordfile = data_root + 'msync-bach10.tfrecord'
+tfrecordfile = data_root + 'MSYNC-bach10.tfrecord'
 train_test_ratio = 0.8
 
 

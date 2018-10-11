@@ -1,7 +1,7 @@
 
 import tensorflow as tf
 import numpy as np
-import models.loss as loss
+import msync.loss as loss
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 import importlib
