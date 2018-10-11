@@ -16,8 +16,8 @@ class GFNN:
         if osc_params is not None:
             self._osc_params = osc_params
         else:
-            self._osc_params = {'f_min': 0.125,
-                                'f_max': 8.0,
+            self._osc_params = {'f_min': 20.0,  #0.125,
+                                'f_max': 5000.0,  #8.0,
                                 'alpha': -1.0,
                                 'beta1': -1.0,
                                 'beta2': 0.0,
@@ -120,12 +120,12 @@ class GFNN:
         return z_state, self._c_state
 
 
-class KerasLayer(tf.keras.layers.Layer):
+class GFNNLayer(tf.keras.layers.Layer):
     def __init__(self, num_osc, dt,
                  input_normalization=False, input_normalization_max_val=0.25,
                  osc_params=None, use_hebbian_learning=False, heb_params=None, **kwargs):
 
-        super(KerasLayer, self).__init__(**kwargs)
+        super(GFNNLayer, self).__init__(**kwargs)
         self.input_normalization = input_normalization
         self.input_normalization_max_val = input_normalization_max_val
         self.gfnn = GFNN(num_osc, dt, osc_params, use_hebbian_learning, heb_params)
@@ -142,10 +142,12 @@ class KerasLayer(tf.keras.layers.Layer):
             inputs = tf.complex(inputs, 0.0)
 
         z_state = tf.abs(self.gfnn.run(inputs)[0])
+
+        tf.summary.image('z_state', tf.expand_dims(z_state, axis=-1))
         return z_state
 
     def build(self, input_shape):
-        super(KerasLayer, self).build(input_shape)  # Be sure to call this at the end
+        super(GFNNLayer, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
         return input_shape[0],  input_shape[-1], self.gfnn._num_osc

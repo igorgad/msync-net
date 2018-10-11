@@ -49,5 +49,5 @@ def pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params))
     tfdataset = tfdataset.map(prepare_examples)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle']).prefetch(1024)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(data_params['shuffle_buffer'])
     return tfdataset

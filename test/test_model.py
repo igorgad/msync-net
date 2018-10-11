@@ -2,13 +2,13 @@
 
 import tensorflow as tf
 import numpy as np
-from models import simple_gfnn
+from models import simple_models
 from models import loss
 import matplotlib.pyplot as plt
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import importlib
-importlib.reload(simple_gfnn)
+importlib.reload(simple_models)
 importlib.reload(loss)
 
 nosc = 180
@@ -24,12 +24,14 @@ sin = np.concatenate([sin1, sin0], axis=0)
 sin = np.repeat(np.expand_dims(sin, 0),  batch_size, axis=0)
 
 
-data_params = {'dataset_file': '/media/igor/DATA/Dataset/BACH10/msync-bach10.tfrecord',
-               'audio_root': '/media/igor/DATA/Dataset/BACH10/Audio',
-               'sample_rate': Fs,
+data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
+               'audio_root': './data/BACH10/Audio',
+               'sample_rate': 44100//4,
                'frame_length': 2048,
-               'frame_step': 1024,
-               'batch_size': batch_size
+               'frame_step': 2048,
+               'batch_size': 1,
+               'repeat': 100,
+               'shuffle_buffer': 128
                }
 
 model_params = {'num_osc': nosc,
@@ -39,6 +41,8 @@ model_params = {'num_osc': nosc,
                 'lr': 0.01
                 }
 
-callback_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs', batch_size=batch_size, write_images=True)
-model = simple_gfnn.simple_gfnn_cca_v0(model_params)
-model.fit([sin, sin], sin, validation_data=[[sin, sin], sin], validation_steps=1, epochs=2, steps_per_epoch=1, callbacks=[callback_tb])
+
+model = simple_models.simple_gfnn_cca_v0(model_params)
+
+tb = tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=1, batch_size=batch_size, write_images=True)
+st = model.fit([sin, sin], sin, validation_data=[[sin, sin], sin], validation_steps=4, epochs=4, steps_per_epoch=4, callbacks=[tb])
