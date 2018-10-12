@@ -12,8 +12,10 @@ def create_dtw_image(r):
     dist, cost, acc_cost, path = dtw(r1.T, r2.T, dist=lambda x, y: norm(x - y, ord=1))
 
     fig = tfmpl.create_figure(figsize=(4, 4))
-    ax = fig.add_subplot(1)
+    ax = fig.add_subplot(1, 1, 1)
     ax.imshow(cost.T, origin='lower', cmap='gray', interpolation='nearest')
+    ax.plot(path[0], path[1], 'w')
+    ax.set_title('dist = ' + str(dist))
     return fig
 
 

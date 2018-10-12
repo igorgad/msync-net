@@ -25,6 +25,15 @@ p0 = np.complex64(0.2 * np.exp(1j * 2 * np.pi * 2.0 * t[t.size//2:]))
 sin1 = np.repeat(np.expand_dims(np.concatenate([p1, p0], axis=0), 0),  batch_size, axis=0)
 sin2 = np.repeat(np.expand_dims(np.concatenate([p0, p1], axis=0), 0),  batch_size, axis=0)
 
+osc_params = {'f_min': 0.125,
+                'f_max': 8.0,
+                'alpha': -1.0,
+                'beta1': -1.0,
+                'beta2': 0.0,
+                'delta1': 0.0,
+                'delta2': 0.0,
+                'eps': 1.0,
+                'k': 1.0}
 
 data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
@@ -38,6 +47,7 @@ data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
 
 model_params = {'num_osc': nosc,
                 'dt': dt,
+                'osc_params': osc_params,
                 'input_shape': (sin1.shape[1],),
                 'outdim_size': 128,
                 'lr': 0.01
@@ -46,5 +56,5 @@ model_params = {'num_osc': nosc,
 
 model = simple_models.simple_gfnn_cca_v0(model_params)
 
-tb = stats.TensorBoardDTW(log_dir='./logs', histogram_freq=1, batch_size=batch_size, write_images=True)
+tb = stats.TensorBoardDTW(log_dir='./logs/test_model', histogram_freq=1, batch_size=batch_size, write_images=True)
 st = model.fit([sin1, sin2], sin1, validation_data=[[sin1, sin2], sin1], validation_steps=4, epochs=4, steps_per_epoch=2, callbacks=[tb])

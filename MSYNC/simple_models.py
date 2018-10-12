@@ -20,7 +20,7 @@ def simple_gfnn_cca_v0(model_params):
 
 
 def build_gfnn_lstm_branch(model_params):
-    gfnn = GFNN.GFNNLayer(model_params['num_osc'], model_params['dt'])
+    gfnn = GFNN.GFNNLayer(model_params['num_osc'], model_params['dt'], osc_params=model_params['osc_params'])
 
     input = tf.keras.Input(model_params['input_shape'])
     output = gfnn(input)
