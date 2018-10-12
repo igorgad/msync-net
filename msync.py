@@ -21,21 +21,21 @@ osc_params = {'f_min': 20.0,
               'k': 1.0
               }
 
-model_params = {'num_osc': 360,
+model_params = {'num_osc': 256,
                 'dt': 1/(44100//4),
                 'osc_params': osc_params,
-                'input_shape': (1024,),
+                'input_shape': (2048,),
                 'outdim_size': 128,
                 'lr': 0.01
                 }
 
-data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
+data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 44100//4,
-               'frame_length': 1024,
-               'frame_step': 1024,
+               'frame_length': 2048,
+               'frame_step': 2048,
                'batch_size': 1,
-               'repeat': 100,
+               'repeat': 128,
                'shuffle_buffer': 128
                }
 
