@@ -4,8 +4,7 @@ import numpy as np
 
 
 class GFNN:
-    """A GFNN implemented in the form of a RNN Cell."""
-
+    
     def __init__(self, num_osc, dt, osc_params=None, use_hebbian_learning=False, heb_params=None):
         self._num_osc = num_osc
         self._dt = dt
