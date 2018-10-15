@@ -39,7 +39,7 @@ data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 44100//4,
                'frame_length': 2048,
-               'frame_step': 2048,
+               'frame_step': 1024,
                'batch_size': 1,
                'repeat': 100,
                'shuffle_buffer': 128
@@ -54,7 +54,7 @@ model_params = {'num_osc': nosc,
                 }
 
 
-model = simple_models.simple_gfnn_cca_v0(model_params)
+model, v1_model, v2_model = simple_models.simple_gfnn_cca_v0(model_params)
 
 tb = stats.TensorBoardDTW(log_dir='./logs/test_model', histogram_freq=1, batch_size=batch_size, write_images=True)
 st = model.fit([sin1, sin2], sin1, validation_data=[[sin1, sin2], sin1], validation_steps=4, epochs=4, steps_per_epoch=2, callbacks=[tb])

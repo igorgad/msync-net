@@ -44,19 +44,52 @@ def frame_signals(parsed_features, data_params):
     return parsed_features
 
 
-def prepare_examples(parsed_features):
+def prepare_examples_for_dctw(parsed_features):
     data = (parsed_features['framed_signals'][0], parsed_features['framed_signals'][1])
     labels = tf.zeros_like(parsed_features['framed_signals'][0])
     example = data, labels
     return example
 
 
-def pipeline(data_params):
+def prepare_examples_for_v1(parsed_features):
+    data = parsed_features['framed_signals'][0]
+    labels = data
+    example = data, labels
+    return example
+
+
+def prepare_examples_for_v2(parsed_features):
+    data = parsed_features['framed_signals'][1]
+    labels = data
+    example = data, labels
+    return example
+
+
+def base_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params))
-    tfdataset = tfdataset.map(prepare_examples)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(data_params['shuffle_buffer'])
+    return tfdataset
+
+
+def dctw_pipeline(data_params):
+    tfdataset = base_pipeline(data_params)
+    tfdataset = tfdataset.map(prepare_examples_for_dctw)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(4)
+    return tfdataset
+
+
+def v1_pipeline(data_params):
+    tfdataset = base_pipeline(data_params)
+    tfdataset = tfdataset.map(prepare_examples_for_v1)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(4)
+    return tfdataset
+
+
+def v2_pipeline(data_params):
+    tfdataset = base_pipeline(data_params)
+    tfdataset = tfdataset.map(prepare_examples_for_v2)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(4)
     return tfdataset
