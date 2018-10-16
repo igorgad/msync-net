@@ -15,10 +15,10 @@ class GFNN:
         if osc_params is not None:
             self._osc_params = osc_params
         else:
-            self._osc_params = {'f_min': 20.0,
+            self._osc_params = {'f_min': 200.0,
                                 'f_max': 5000.0,
                                 'alpha': -1.0,
-                                'beta1': -1.0,
+                                'beta1': -10.0,
                                 'beta2': 0.0,
                                 'delta1': 0.0,
                                 'delta2': 0.0,

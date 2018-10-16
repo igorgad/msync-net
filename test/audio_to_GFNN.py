@@ -1,4 +1,5 @@
-from msync import GFNN
+
+from MSYNC import GFNN
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,9 +11,9 @@ importlib.reload(GFNN)
 
 # Params
 downsample_rate = 4
-nosc = 180
+nosc = 256
 batch_size = 1
-boff = 100
+boff = 7000
 Fs = 44100.0 / downsample_rate
 dt = 1.0/Fs
 # audio_file = '/media/igor/DATA/Dataset/Audio/AClassicEducation_NightOwl_STEMS/AClassicEducation_NightOwl_STEM_05.wav'
@@ -21,14 +22,14 @@ samples_length = 1024 * 8
 
 # Load Audio
 audio_binary = tf.read_file(audio_file)
-waveform = tf.reduce_mean(tf.contrib.ffmpeg.decode_audio(audio_binary, file_format='wav', samples_per_second=np.int32(Fs), channel_count=2), axis=1)
+waveform = tf.reduce_mean(tf.contrib.ffmpeg.decode_audio(audio_binary, file_format='wav', samples_per_second=np.int32(Fs), channel_count=2), axis=1)[boff:]
 # waveform = tf.gather(waveform, tf.range(0, tf.size(waveform), downsample_rate), axis=0)
 waveform = 0.25 * waveform / tf.reduce_max(waveform)
 
 waveform = tf.contrib.signal.frame(waveform, samples_length, samples_length)
 sin = tf.complex(waveform, 0.0)
 
-with tf.device('/device:GPU:1'):
+with tf.device('/device:GPU:0'):
     gfnn = GFNN.GFNN(nosc, dt, use_hebbian_learning=False)
     z_state, c_state = gfnn.run(sin)
 
@@ -67,6 +68,7 @@ ax4.set_title('Average Absolute Response')
 
 # import sounddevice as sd
 # sd.play(in_stim, Fs)
+# sd.play(np.abs(sz[0,:,:].sum(1)), Fs)
 
 
 if gfnn._use_hebbian_learning:
