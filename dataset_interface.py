@@ -44,6 +44,16 @@ def frame_signals(parsed_features, data_params):
     return parsed_features
 
 
+def limit_amount_of_frames(parsed_features, data_params):
+    nws_per_signal = tf.map_fn(lambda sig: tf.shape(sig)[0], parsed_features['framed_signals'], dtype=tf.int32, infer_shape=False)
+    nws_min = tf.reduce_min(nws_per_signal)
+    min_range = tf.where(data_params['batch_size'] > nws_min, 0, tf.random_uniform([1], 0, tf.abs(nws_min - data_params['batch_size']), dtype=tf.int32)[0])
+    max_range = tf.where(data_params['batch_size'] > nws_min, nws_min, min_range + data_params['batch_size'])
+    frames = tf.range(min_range, max_range)
+    parsed_features['framed_signals'] = tf.map_fn(lambda sig: tf.gather(sig, frames, axis=0), parsed_features['framed_signals'], dtype=tf.float32, infer_shape=False)
+    return parsed_features
+
+
 def prepare_examples_for_dctw(parsed_features):
     data = (parsed_features['framed_signals'][0], parsed_features['framed_signals'][1])
     labels = tf.zeros_like(parsed_features['framed_signals'][0])
@@ -71,6 +81,7 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: limit_amount_of_frames(feat, data_params))
     return tfdataset
 
 
