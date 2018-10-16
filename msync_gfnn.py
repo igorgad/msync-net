@@ -32,8 +32,8 @@ model_params = {'num_osc': 256,
                 'outdim_size': 128,
                 'pre_train_lr': 0.001,
                 'dctw_lr': 0.01,
-                'v1_weights_file': './models/v1_gfnn_weights.h5',
-                'v2_weights_file': './models/v2_gfnn_weights.h5',
+                'v1_weights_file': './saved_models/v1_gfnn_weights.h5',
+                'v2_weights_file': './saved_models/v2_gfnn_weights.h5',
                 }
 
 data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
