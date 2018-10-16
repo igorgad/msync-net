@@ -2,30 +2,18 @@
 import os
 import tensorflow as tf
 import dataset_interface as dts
-import MSYNC.simple_models as gfnn_model
+import MSYNC.stft_model as stft_model
 import MSYNC.loss as loss
 import MSYNC.stats as stats
 import importlib
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 importlib.reload(dts)
-importlib.reload(gfnn_model)
+importlib.reload(stft_model)
 importlib.reload(stats)
 
-osc_params = {'f_min': 200.0,
-              'f_max': 5000.0,
-              'alpha': -1.0,
-              'beta1': -10.0,
-              'beta2': 0.0,
-              'delta1': 0.0,
-              'delta2': 0.0,
-              'eps': 1.0,
-              'k': 1.0
-              }
-
-model_params = {'num_osc': 128,
-                'dt': 1/(44100//4),
-                'osc_params': osc_params,
+model_params = {'stft_frame_length': 512,
+                'stft_frame_step': 256,
                 'input_shape': (8192,),
                 'outdim_size': 128,
                 'pre_train_lr': 0.001,
@@ -37,16 +25,15 @@ model_params = {'num_osc': 128,
 data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 44100//4,
-               'frame_length': 8192,
-               'frame_step': 2048,
-               'batch_size': 16,
-               'repeat': 10,
+               'example_length': 8192,
+               'batch_size': 1,
+               'repeat': 40,
                'shuffle_buffer': 32,
-               'scale_value': 0.25
+               'scale_value': 1.0
                }
 
 # Get models
-dctw_model, v1_model, v2_model = gfnn_model.simple_stft_cca_v0(model_params)
+dctw_model, v1_model, v2_model = stft_model.simple_stft_cca(model_params)
 
 # Apply denoising autoencoder pre-training if necessary
 if not os.path.isfile(model_params['v1_weights_file']):

@@ -36,40 +36,32 @@ def scale_signals(parsed_features, data_params):
     return parsed_features
 
 
-def frame_signals(parsed_features, data_params):
-    def frame_signal(signal):
-        return tf.contrib.signal.frame(signal, data_params['frame_length'], data_params['frame_step'])
-
-    parsed_features['framed_signals'] = tf.map_fn(frame_signal, parsed_features['signals'], dtype=tf.float32, infer_shape=False)
-    return parsed_features
-
-
-def limit_amount_of_frames(parsed_features, data_params):
-    nws_per_signal = tf.map_fn(lambda sig: tf.shape(sig)[0], parsed_features['framed_signals'], dtype=tf.int32, infer_shape=False)
+def limit_amount_of_samples(parsed_features, data_params):
+    nws_per_signal = tf.map_fn(lambda sig: tf.shape(sig)[0], parsed_features['signals'], dtype=tf.int32, infer_shape=False)
     nws_min = tf.reduce_min(nws_per_signal)
-    min_range = tf.where(data_params['batch_size'] > nws_min, 0, tf.random_uniform([1], 0, tf.abs(nws_min - data_params['batch_size']), dtype=tf.int32)[0])
-    max_range = tf.where(data_params['batch_size'] > nws_min, nws_min, min_range + data_params['batch_size'])
+    min_range = tf.where(data_params['example_length'] > nws_min, 0, tf.random_uniform([1], 0, tf.abs(nws_min - data_params['example_length']), dtype=tf.int32)[0])
+    max_range = tf.where(data_params['example_length'] > nws_min, nws_min, min_range + data_params['example_length'])
     frames = tf.range(min_range, max_range)
-    parsed_features['framed_signals'] = tf.map_fn(lambda sig: tf.gather(sig, frames, axis=0), parsed_features['framed_signals'], dtype=tf.float32, infer_shape=False)
+    parsed_features['signals'] = tf.map_fn(lambda sig: tf.gather(sig, frames, axis=0), parsed_features['signals'], dtype=tf.float32, infer_shape=False)
     return parsed_features
 
 
 def prepare_examples_for_dctw(parsed_features):
-    data = (parsed_features['framed_signals'][0], parsed_features['framed_signals'][1])
-    labels = tf.zeros_like(parsed_features['framed_signals'][0])
+    data = (parsed_features['signals'][0], parsed_features['signals'][1])
+    labels = tf.zeros_like(parsed_features['signals'][0])
     example = data, labels
     return example
 
 
 def prepare_examples_for_v1(parsed_features):
-    data = parsed_features['framed_signals'][0]
+    data = parsed_features['signals'][0]
     labels = data
     example = data, labels
     return example
 
 
 def prepare_examples_for_v2(parsed_features):
-    data = parsed_features['framed_signals'][1]
+    data = parsed_features['signals'][1]
     labels = data
     example = data, labels
     return example
@@ -80,27 +72,26 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params))
-    tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params))
-    tfdataset = tfdataset.map(lambda feat: limit_amount_of_frames(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: limit_amount_of_samples(feat, data_params))
     return tfdataset
 
 
 def dctw_pipeline(data_params):
     tfdataset = base_pipeline(data_params)
     tfdataset = tfdataset.map(prepare_examples_for_dctw)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(4)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
     return tfdataset
 
 
 def v1_pipeline(data_params):
     tfdataset = base_pipeline(data_params)
     tfdataset = tfdataset.map(prepare_examples_for_v1)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(4)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
     return tfdataset
 
 
 def v2_pipeline(data_params):
     tfdataset = base_pipeline(data_params)
     tfdataset = tfdataset.map(prepare_examples_for_v2)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).prefetch(4)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
     return tfdataset

@@ -7,9 +7,9 @@ import tfmpl
 
 @tfmpl.figure_tensor
 def create_dtw_image(r):
-    r1 = r[:, :r.shape[1] // 2]
-    r2 = r[:, r.shape[1] // 2:]
-    dist, cost, acc_cost, path = dtw(r1.T, r2.T, dist=lambda x, y: norm(x - y, ord=1))
+    r1 = r[0, :, :r.shape[1] // 2]
+    r2 = r[0, :, r.shape[1] // 2:]
+    dist, cost, acc_cost, path = dtw(r1, r2, dist=lambda x, y: norm(x - y, ord=1))
 
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)

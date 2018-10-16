@@ -2,14 +2,14 @@
 
 import tensorflow as tf
 import numpy as np
-from MSYNC import simple_models
+from MSYNC import stft_model
 from MSYNC import loss
 from MSYNC import stats
 import matplotlib.pyplot as plt
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import importlib
-importlib.reload(simple_models)
+importlib.reload(stft_model)
 importlib.reload(loss)
 importlib.reload(stats)
 
@@ -54,7 +54,7 @@ model_params = {'num_osc': nosc,
                 }
 
 
-model, v1_model, v2_model = simple_models.simple_stft_cca_v0(model_params)
+model, v1_model, v2_model = stft_model.simple_stft_cca_v0(model_params)
 model.compile(loss=loss.cca_loss, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['lr']))
 
 tb = stats.TensorBoardDTW(log_dir='./logs/test_model', histogram_freq=1, batch_size=batch_size, write_images=True)

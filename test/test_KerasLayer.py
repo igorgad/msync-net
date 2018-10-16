@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
-from msync import GFNN
+from msync_stft import GFNN
 import matplotlib.pyplot as plt
 import os
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
