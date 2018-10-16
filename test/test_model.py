@@ -17,7 +17,7 @@ nosc = 180
 batch_size = 128
 Fs = 60.0
 dt = 1.0/Fs
-t = np.arange(0, 20, dt)
+t = np.arange(0, 100, dt)
 ff = 1.0 # 2.095676
 # sin = np.float32(0.2 * np.sin(2 * np.pi * ff * t))
 p1 = np.complex64(0.2 * np.exp(1j * 2 * np.pi * ff * t[:t.size//2]))
@@ -35,27 +35,18 @@ osc_params = {'f_min': 0.125,
                 'eps': 1.0,
                 'k': 1.0}
 
-data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
-               'audio_root': './data/BACH10/Audio',
-               'sample_rate': 44100//4,
-               'frame_length': 8192,
-               'frame_step': 4096,
-               'batch_size': 1,
-               'repeat': 100,
-               'shuffle_buffer': 128
-               }
-
-model_params = {'num_osc': nosc,
-                'dt': dt,
-                'osc_params': osc_params,
-                'input_shape': (sin1.shape[1],),
+model_params = {'stft_frame_length': 512,
+                'stft_frame_step': 256,
+                'input_shape': (sin2.shape[-1],),
                 'outdim_size': 128,
-                'lr': 0.01
+                'pre_train_lr': 0.001,
+                'dctw_lr': 0.01,
+                'v1_weights_file': './saved_models/v1_stft_weights.h5',
+                'v2_weights_file': './saved_models/v2_stft_weights.h5',
                 }
 
-
-model, v1_model, v2_model = stft_model.simple_stft_cca_v0(model_params)
-model.compile(loss=loss.cca_loss, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['lr']))
+model, v1_model, v2_model = stft_model.simple_stft_cca(model_params)
+model.compile(loss=loss.cca_loss, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr']))
 
 tb = stats.TensorBoardDTW(log_dir='./logs/test_model', histogram_freq=1, batch_size=batch_size, write_images=True)
 st = model.fit([sin1, sin2], sin1, validation_data=[[sin1, sin2], sin1], validation_steps=4, epochs=4, steps_per_epoch=2, callbacks=[tb])
