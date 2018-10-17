@@ -34,5 +34,5 @@ def build_stft_lstm_branch(input, model_params):
 
 def stft_layer_func(signal, model_params):
     stft = tf.abs(tf.contrib.signal.stft(signal, model_params['stft_frame_length'], model_params['stft_frame_step'], pad_end=True))
-    tf.summary.image('stft', tf.expand_dims(tf.layers.batch_normalization(stft, trainable=False), -1))
+    tf.summary.image('stft', tf.expand_dims(stft, -1))
     return stft
