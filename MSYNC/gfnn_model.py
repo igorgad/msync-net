@@ -21,7 +21,13 @@ def build_gfnn_lstm_branch(input, model_params):
     gfnn_layer = GFNN.GFNNLayer(model_params['num_osc'], model_params['dt'], osc_params=model_params['osc_params'])
     gfnn = gfnn_layer(input)
 
-    middle_output = tf.keras.layers.LSTM(model_params['outdim_size'])(gfnn)
+    middle_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(gfnn)
+    middle_output = tf.keras.layers.BatchNormalization()(middle_output)
+    middle_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(middle_output)
+    middle_output = tf.keras.layers.BatchNormalization()(middle_output)
+    middle_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(middle_output)
+    middle_output = tf.keras.layers.BatchNormalization()(middle_output)
 
-    end_output = tf.keras.layers.Dense(model_params['input_shape'][0])(middle_output)
+    end_output = tf.keras.layers.CuDNNLSTM(1, return_sequences=True)(middle_output)
+    end_output = tf.keras.layers.Flatten()(end_output)
     return middle_output, end_output
