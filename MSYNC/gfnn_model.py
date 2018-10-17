@@ -19,14 +19,9 @@ def simple_gfnn_cca(model_params):
 
 def build_gfnn_lstm_branch(input, model_params):
     gfnn_layer = GFNN.GFNNLayer(model_params['num_osc'], model_params['dt'], osc_params=model_params['osc_params'])
-
-    # input = tf.keras.layers.Lambda(lambda signal: frame_layer_func(signal, model_params), name='stft')(input)
     gfnn = gfnn_layer(input)
+
     middle_output = tf.keras.layers.LSTM(model_params['outdim_size'])(gfnn)
+
     end_output = tf.keras.layers.Dense(model_params['input_shape'][0])(middle_output)
     return middle_output, end_output
-
-
-def frame_layer_func(signal, model_params):
-    framed_signal = tf.contrib.signal.frame(signal, model_params['gfnn_frame_length'], model_params['gfnn_frame_step'])
-    return framed_signal

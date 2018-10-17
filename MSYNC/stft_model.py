@@ -18,7 +18,9 @@ def simple_stft_cca(model_params):
 
 def build_stft_lstm_branch(input, model_params):
     stft = tf.keras.layers.Lambda(lambda signal: stft_layer_func(signal, model_params))(input)
+
     middle_output = tf.keras.layers.LSTM(model_params['outdim_size'], return_sequences=True)(stft)
+
     end_output = tf.keras.layers.Dense(model_params['input_shape'][0])(middle_output)
     return middle_output, end_output
 
