@@ -40,7 +40,7 @@ model_params = {'stft_frame_length': 512,
                 'input_shape': (sin2.shape[-1],),
                 'outdim_size': 128,
                 'pre_train_lr': 0.001,
-                'dctw_lr': 0.01,
+                'dctw_lr': 0.001,
                 'v1_weights_file': './saved_models/v1_stft_weights.h5',
                 'v2_weights_file': './saved_models/v2_stft_weights.h5',
                 }
