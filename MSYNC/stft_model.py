@@ -25,14 +25,19 @@ def build_stft_lstm_branch(input, model_params):
     middle_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(middle_output)
     middle_output = tf.keras.layers.BatchNormalization()(middle_output)
     middle_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(middle_output)
-    middle_output = tf.keras.layers.BatchNormalization()(middle_output)
 
-    end_output = tf.keras.layers.CuDNNLSTM(1, return_sequences=True)(middle_output)
+    end_output = tf.keras.layers.BatchNormalization()(middle_output)
+    end_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(end_output)
+    end_output = tf.keras.layers.BatchNormalization()(end_output)
+    end_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(end_output)
+    end_output = tf.keras.layers.BatchNormalization()(end_output)
+    end_output = tf.keras.layers.CuDNNLSTM(1, return_sequences=True)(end_output)
     end_output = tf.keras.layers.Flatten()(end_output)
     return middle_output, end_output
 
 
 def stft_layer_func(signal, model_params):
-    stft = tf.abs(tf.contrib.signal.stft(signal, model_params['stft_frame_length'], model_params['stft_frame_step'], pad_end=True))
-    tf.summary.image('stft', tf.expand_dims(stft, -1))
+    with tf.device('/device:GPU:0'):
+        stft = tf.abs(tf.contrib.signal.stft(signal, model_params['stft_frame_length'], model_params['stft_frame_step'], pad_end=True))
+        tf.summary.image('stft', tf.expand_dims(stft, -1))
     return stft

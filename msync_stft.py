@@ -12,6 +12,8 @@ importlib.reload(dts)
 importlib.reload(stft_model)
 importlib.reload(stats)
 
+logname = 'stft_lstm'
+
 model_params = {'stft_frame_length': 512,
                 'stft_frame_step': 1,
                 'input_shape': (10240,),
@@ -40,7 +42,7 @@ if not os.path.isfile(model_params['v1_weights_file']):
     print ('Pre-training branch 1')
     v1_model.summary()
     v1_data = dts.v1_pipeline(data_params)
-    v1_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/stft_v0/pre-train_v1')
+    v1_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/pre-train_v1' % logname)
     v1_st = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0, patience=4, verbose=1, mode='auto')
     v1_model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['pre_train_lr']))
     v1_model.fit(v1_data, epochs=40, steps_per_epoch=10, callbacks=[v1_tb, v1_st])
@@ -51,7 +53,7 @@ if not os.path.isfile(model_params['v2_weights_file']):
     print('Pre-training branch 2')
     v2_model.summary()
     v2_data = dts.v2_pipeline(data_params)
-    v2_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/stft_v0/pre-train_v2')
+    v2_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/pre-train_v2' % logname)
     v2_st = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0, patience=4, verbose=1, mode='auto')
     v2_model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['pre_train_lr']))
     v2_model.fit(v2_data, epochs=40, steps_per_epoch=10, callbacks=[v2_tb, v2_st])
@@ -60,12 +62,13 @@ if not os.path.isfile(model_params['v2_weights_file']):
 
 # DCTW Training
 print('Training DCTW...')
-data_params['batch_size'] = data_params['batch_size'] // 2
+data_params['batch_size'] = 1
 dctw_data = dts.dctw_pipeline(data_params)
-dctw_tb = stats.TensorBoardDTW(log_dir='./logs/stft_v0/dctw0', histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
+dctw_st = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0, patience=4, verbose=1, mode='auto')
+dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
 
 dctw_model.summary()
 dctw_model.load_weights(model_params['v1_weights_file'], by_name=True)
 dctw_model.load_weights(model_params['v2_weights_file'], by_name=True)
 dctw_model.compile(loss=loss.cca_loss, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
-dctw_model.fit(dctw_data, epochs=20, steps_per_epoch=8, validation_data=dctw_data, validation_steps=1, callbacks=[dctw_tb])
+dctw_model.fit(dctw_data, epochs=100, steps_per_epoch=8, validation_data=dctw_data, validation_steps=1, callbacks=[dctw_tb])
