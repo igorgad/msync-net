@@ -25,8 +25,7 @@ class GFNN:
                                 'eps': 1.0,
                                 'k': 1.0}
 
-        self._f = np.logspace(np.log10(self._osc_params['f_min']), np.log10(self._osc_params['f_max']),
-                              self._num_osc, dtype=np.float32)
+        self._f = np.logspace(np.log10(self._osc_params['f_min']), np.log10(self._osc_params['f_max']), self._num_osc, dtype=np.float32)
         self._osc_params['alpha'] = self._osc_params['alpha'] * np.ones(self._num_osc, np.float32)
         self._a = tf.complex(self._osc_params['alpha'], 2 * np.pi) * self._f
         self._b = tf.complex(self._osc_params['beta1'], self._osc_params['delta1']) * self._f

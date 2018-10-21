@@ -26,12 +26,10 @@ def cca_loss(y_true, y_pred):
     [d1, v1] = tf.linalg.eigh(sigma_hat11)
     [d2, v2] = tf.linalg.eigh(sigma_hat22)
 
-    mask1 = tf.map_fn(lambda val: val > eps, d1, dtype=tf.bool)
-    d1 = tf.map_fn(lambda bi: tf.boolean_mask(d1[bi, :], mask1[bi, :]), tf.range(bs), dtype=tf.float32)
-    v1 = tf.map_fn(lambda bi: tf.boolean_mask(v1[bi, :], mask1[bi, :]), tf.range(bs), dtype=tf.float32)
-    mask2 = tf.map_fn(lambda val: val > eps, d2, dtype=tf.bool)
-    d2 = tf.map_fn(lambda bi: tf.boolean_mask(d2[bi, :], mask2[bi, :]), tf.range(bs), dtype=tf.float32)
-    v2 = tf.map_fn(lambda bi: tf.boolean_mask(v2[bi, :], mask2[bi, :]), tf.range(bs), dtype=tf.float32)
+    d1 = tf.where(d1 > eps, d1, eps * tf.ones_like(d1))
+    v1 = tf.where(v1 > eps, v1, eps * tf.ones_like(v1))
+    d2 = tf.where(d2 > eps, d2, eps * tf.ones_like(d2))
+    v2 = tf.where(v2 > eps, v2, eps * tf.ones_like(v2))
 
     sigma_hat11_root_inv = tf.matmul(tf.matmul(v1, tf.matrix_diag(tf.sqrt(d1))), v1, transpose_b=True)
     sigma_hat22_root_inv = tf.matmul(tf.matmul(v2, tf.matrix_diag(tf.sqrt(d2))), v2, transpose_b=True)

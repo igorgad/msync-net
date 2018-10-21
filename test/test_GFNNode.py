@@ -12,7 +12,7 @@ batch_size = 1
 Fs = 60.0
 dt = 1.0/Fs
 t = np.arange(0, 20, dt)
-ff = 1.0 # 2.095676
+ff = 2.0 # 2.095676
 # sin = np.float32(0.2 * np.sin(2 * np.pi * ff * t))
 sin = np.complex64(0.2 * np.exp(1j * 2 * np.pi * ff * t))
 sin = np.repeat(np.expand_dims(sin, 0),  batch_size, axis=0)
