@@ -25,8 +25,9 @@ osc_params = {'f_min': 200.0,
               'k': 1.0
               }
 
-model_params = {'stft_frame_length': 512,
-                'stft_frame_step': 1,
+model_params = {'num_osc': 256,
+                'dt': 1/(44100//4),
+                'osc_params': osc_params,
                 'input_shape': (10240,),
                 'outdim_size': 128,
                 'pre_train_lr': 0.0001,
