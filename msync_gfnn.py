@@ -76,7 +76,7 @@ if not os.path.isfile(model_params['v2_weights_file']):
 print('Training DCTW...')
 data_params['batch_size'] = 1
 dctw_data = dts.dctw_pipeline(data_params)
-dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw0/model-checkpoint-weights.{epoch:02d}-{val_loss:.2f}.hdf5' % logname,
+dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw0/model-checkpoint.hdf5' % logname,
                                              monitor='val_loss', period=4, save_best_only=True)
 dctw_st = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0, patience=4, verbose=1, mode='auto')
 dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
