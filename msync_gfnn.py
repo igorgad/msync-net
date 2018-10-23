@@ -40,10 +40,10 @@ data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 44100//4,
                'example_length': 10240,
-               'batch_size': 16,
+               'batch_size': 8,
                'repeat': 10000,
                'shuffle_buffer': 32,
-               'scale_value': 1.0
+               'scale_value': 0.2
                }
 
 # Get models
@@ -76,6 +76,8 @@ if not os.path.isfile(model_params['v2_weights_file']):
 print('Training DCTW...')
 data_params['batch_size'] = 1
 dctw_data = dts.dctw_pipeline(data_params)
+dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw0/model-checkpoint-weights.{epoch:02d}-{val_loss:.2f}.hdf5' % logname,
+                                             monitor='val_loss', period=4, save_best_only=True)
 dctw_st = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0, patience=4, verbose=1, mode='auto')
 dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
 
@@ -83,4 +85,4 @@ dctw_model.summary()
 dctw_model.load_weights(model_params['v1_weights_file'], by_name=True)
 dctw_model.load_weights(model_params['v2_weights_file'], by_name=True)
 dctw_model.compile(loss=loss.cca_loss, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
-dctw_model.fit(dctw_data, epochs=100, steps_per_epoch=8, validation_data=dctw_data, validation_steps=10, callbacks=[dctw_tb])
+dctw_model.fit(dctw_data, epochs=400, steps_per_epoch=20, validation_data=dctw_data, validation_steps=10, callbacks=[dctw_tb, dctw_cp])
