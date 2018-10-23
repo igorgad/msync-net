@@ -72,5 +72,5 @@ dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw0' % logname, histogram_fr
 dctw_model.summary()
 dctw_model.load_weights(model_params['v1_weights_file'], by_name=True)
 dctw_model.load_weights(model_params['v2_weights_file'], by_name=True)
-dctw_model.compile(loss=loss.cca_loss, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
+dctw_model.compile(loss=loss.cca_loss(model_params['outdim_size'], False), optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
 dctw_model.fit(dctw_data, epochs=400, steps_per_epoch=20, validation_data=dctw_data, validation_steps=10, callbacks=[dctw_tb, dctw_cp])
