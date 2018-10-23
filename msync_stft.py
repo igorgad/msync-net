@@ -12,7 +12,7 @@ importlib.reload(dts)
 importlib.reload(stft_model)
 importlib.reload(stats)
 
-logname = 'stft_lstm_r1'
+logname = 'stft_dnn_r0'
 
 model_params = {'stft_frame_length': 512,
                 'stft_frame_step': 1,
@@ -29,7 +29,7 @@ data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
                'sample_rate': 44100//4,
                'example_length': 10240,
                'batch_size': 4,
-               'repeat': 10000,
+               'repeat': 100000,
                'shuffle_buffer': 32,
                'scale_value': 1.0
                }
@@ -72,5 +72,5 @@ dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw0' % logname, histogram_fr
 dctw_model.summary()
 dctw_model.load_weights(model_params['v1_weights_file'], by_name=True)
 dctw_model.load_weights(model_params['v2_weights_file'], by_name=True)
-dctw_model.compile(loss=loss.cca_loss(model_params['outdim_size'], False), optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
+dctw_model.compile(loss=loss.cca_loss(model_params['outdim_size'], True), optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
 dctw_model.fit(dctw_data, epochs=400, steps_per_epoch=20, validation_data=dctw_data, validation_steps=10, callbacks=[dctw_tb, dctw_cp])

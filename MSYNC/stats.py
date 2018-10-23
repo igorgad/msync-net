@@ -2,7 +2,6 @@
 import tensorflow as tf
 import numpy as np
 from dtw import fastdtw
-from numpy.linalg import norm
 import tfmpl
 
 
@@ -11,7 +10,7 @@ def create_dtw_image(r):
     idx = np.arange(0, r.shape[1], 32)
     r1 = r[0, idx, :r.shape[-1] // 2]
     r2 = r[0, idx, r.shape[-1] // 2:]
-    dist, cost, acc_cost, path = fastdtw(r1, r2, dist=lambda x, y: norm(x - y, ord=1))
+    dist, cost, acc_cost, path = fastdtw(r1, r2, dist=lambda x, y: np.linalg.norm(np.power(x - y, 2), ord=1))
 
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)
