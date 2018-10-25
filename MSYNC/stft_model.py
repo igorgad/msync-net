@@ -13,8 +13,8 @@ def simple_stft_cca(model_params):
     view1_in = tf.keras.Input(model_params['input_shape'])
     view2_in = tf.keras.Input(model_params['input_shape'])
 
-    view1_middle_out, view1_end_out = build_stft_dnn_branch(view1_in, model_params)
-    view2_middle_out, view2_end_out = build_stft_dnn_branch(view2_in, model_params)
+    view1_middle_out, view1_end_out = build_stft_lstm_branch(view1_in, model_params)
+    view2_middle_out, view2_end_out = build_stft_lstm_branch(view2_in, model_params)
     combined_output = tf.keras.layers.concatenate([view1_middle_out, view2_middle_out])
 
     view1_model = tf.keras.Model(view1_in, view1_end_out)
@@ -35,9 +35,13 @@ def build_stft_lstm_branch(input, model_params):
     middle_output = tf.keras.layers.BatchNormalization()(middle_output)
     middle_output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(2 * model_params['outdim_size'], activation='sigmoid'))(middle_output)
     middle_output = tf.keras.layers.BatchNormalization()(middle_output)
-    middle_output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(2 * model_params['outdim_size'], activation='linear'))(middle_output)
+    middle_output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(model_params['outdim_size'], activation='linear'))(middle_output)
 
     end_output = tf.keras.layers.BatchNormalization()(middle_output)
+    end_output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(model_params['outdim_size'], activation='linear'))(end_output)
+    end_output = tf.keras.layers.BatchNormalization()(end_output)
+    end_output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(2 * model_params['outdim_size'], activation='sigmoid'))(end_output)
+    end_output = tf.keras.layers.BatchNormalization()(end_output)
     end_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(end_output)
     end_output = tf.keras.layers.BatchNormalization()(end_output)
     end_output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(end_output)
