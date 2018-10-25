@@ -36,6 +36,18 @@ def scale_signals(parsed_features, data_params):
     return parsed_features
 
 
+def add_random_delay(parsed_features, data_params):
+    num_signals = tf.shape(parsed_features['signals'])[0]
+    delay = tf.random_uniform([num_signals], 1, data_params['max_delay'], dtype=tf.int32)
+
+    def add_delay(signal_index):
+        return tf.concat([tf.zeros(delay[signal_index], dtype=tf.float32), parsed_features['signals'][signal_index, 0:-delay[signal_index]]], axis=0)
+
+    parsed_features['delay'] = delay
+    parsed_features['signals'] = tf.map_fn(add_delay, tf.range(num_signals), dtype=tf.float32, infer_shape=False)
+    return parsed_features
+
+
 def limit_amount_of_samples(parsed_features, data_params):
     nws_per_signal = tf.map_fn(lambda sig: tf.shape(sig)[0], parsed_features['signals'], dtype=tf.int32, infer_shape=False)
     nws_min = tf.reduce_min(nws_per_signal)
@@ -44,6 +56,13 @@ def limit_amount_of_samples(parsed_features, data_params):
     frames = tf.range(min_range, max_range)
     parsed_features['signals'] = tf.map_fn(lambda sig: tf.gather(sig, frames, axis=0), parsed_features['signals'], dtype=tf.float32, infer_shape=False)
     return parsed_features
+
+
+def prepare_examples_for_classification(parsed_features):
+    data = (parsed_features['signals'][0], parsed_features['signals'][1])
+    label = parsed_features['delay'][0] - parsed_features['delay'][1]
+    example = data, label
+    return example
 
 
 def prepare_examples_for_dctw(parsed_features):
@@ -72,6 +91,7 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: limit_amount_of_samples(feat, data_params))
     return tfdataset
 
