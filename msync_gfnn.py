@@ -43,7 +43,8 @@ data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
                'batch_size': 8,
                'repeat': 10000,
                'shuffle_buffer': 32,
-               'scale_value': 0.2
+               'scale_value': 0.2,
+               'max_delay': 2
                }
 
 # Get models

@@ -91,7 +91,7 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params))
-    tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params))
+    # tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: limit_amount_of_samples(feat, data_params))
     return tfdataset
 
