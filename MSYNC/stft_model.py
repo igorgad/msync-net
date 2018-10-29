@@ -9,7 +9,7 @@ def stft_layer_func(signal, model_params):
     return stft
 
 
-def simple_stft_cca(model_params):
+def build_models(model_params):
     view1_in = tf.keras.Input(model_params['input_shape'])
     view2_in = tf.keras.Input(model_params['input_shape'])
 
@@ -17,10 +17,15 @@ def simple_stft_cca(model_params):
     view2_middle_out, view2_end_out = build_stft_lstm_branch(view2_in, model_params)
     combined_output = tf.keras.layers.concatenate([view1_middle_out, view2_middle_out])
 
+    class_output = tf.keras.layers.Dense(1024)(combined_output)
+    class_output = tf.keras.layers.Dense(1024)(class_output)
+    class_output = tf.keras.layers.Softmax(model_params['num_classes'])(class_output)
+
     view1_model = tf.keras.Model(view1_in, view1_end_out)
     view2_model = tf.keras.Model(view2_in, view2_end_out)
-    model = tf.keras.Model([view1_in, view2_in], combined_output)
-    return model, view1_model, view2_model
+    dctw_model = tf.keras.Model([view1_in, view2_in], combined_output)
+    class_model = tf.keras.Model([view1_in, view2_in], class_output)
+    return class_model, dctw_model, view1_model, view2_model
 
 
 def build_stft_lstm_branch(input, model_params):

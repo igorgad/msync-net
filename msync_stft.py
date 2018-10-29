@@ -12,7 +12,7 @@ importlib.reload(dts)
 importlib.reload(stft_model)
 importlib.reload(stats)
 
-logname = 'stft_dnn_r0'
+logname = 'stft_lstm_classification_r0'
 
 model_params = {'stft_frame_length': 512,
                 'stft_frame_step': 1,
@@ -20,8 +20,11 @@ model_params = {'stft_frame_length': 512,
                 'outdim_size': 128,
                 'pre_train_lr': 0.0001,
                 'dctw_lr': 0.0001,
-                'v1_weights_file': './saved_models/v1_stft_weights.h5',
-                'v2_weights_file': './saved_models/v2_stft_weights.h5',
+                'class_lr': 0.0001,
+                'v1_weights_file': './saved_models/v1_%s_weights.h5' % logname,
+                'v2_weights_file': './saved_models/v2_%s_weights.h5' % logname,
+                'dctw_weights_file': './saved_models/dctw_%s_weights.h5' % logname,
+                'num_classes': 2 * 1
                 }
 
 data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
@@ -36,7 +39,7 @@ data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
                }
 
 # Get models
-dctw_model, v1_model, v2_model = stft_model.simple_stft_cca(model_params)
+class_model, dctw_model, v1_model, v2_model = stft_model.build_models(model_params)
 
 # Apply denoising autoencoder pre-training if necessary
 if not os.path.isfile(model_params['v1_weights_file']):
@@ -65,8 +68,7 @@ if not os.path.isfile(model_params['v2_weights_file']):
 print('Training DCTW...')
 data_params['batch_size'] = 1
 dctw_data = dts.dctw_pipeline(data_params)
-dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw0/model-checkpoint.hdf5' % logname,
-                                             monitor='val_loss', period=1, save_best_only=True)
+dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw0/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 dctw_st = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0, patience=4, verbose=1, mode='auto')
 dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
 
@@ -75,3 +77,18 @@ dctw_model.load_weights(model_params['v1_weights_file'], by_name=True)
 dctw_model.load_weights(model_params['v2_weights_file'], by_name=True)
 dctw_model.compile(loss=loss.cca_loss(model_params['outdim_size'], True), optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
 dctw_model.fit(dctw_data, epochs=400, steps_per_epoch=20, validation_data=dctw_data, validation_steps=10, callbacks=[dctw_tb, dctw_cp])
+v2_model.save_weights(model_params['dctw_weights_file'])
+
+# Classification Training
+print('Training Classifier...')
+data_params['batch_size'] = 8
+class_data = dts.softmax_pipeline(data_params)
+class_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/class0/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
+class_st = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0, patience=4, verbose=1, mode='auto')
+class_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/class0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
+
+class_model.summary()
+class_model.load_weights(model_params['dctw_weights_file'], by_name=True)
+class_model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.RMSprop(lr=model_params['class_lr'], clipnorm=1.0))
+class_model.fit(class_data, epochs=400, steps_per_epoch=20, validation_data=class_data, validation_steps=10, callbacks=[class_tb, class_cp])
+v2_model.save_weights(model_params['dctw_weights_file'])
