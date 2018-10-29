@@ -19,7 +19,6 @@ def build_models(model_params):
 
     class_output = tf.keras.layers.Dense(1024)(combined_output)
     class_output = tf.keras.layers.Dense(1024)(class_output)
-    class_output = tf.keras.layers.Softmax(model_params['num_classes'])(class_output)
 
     view1_model = tf.keras.Model(view1_in, view1_end_out)
     view2_model = tf.keras.Model(view2_in, view2_end_out)
