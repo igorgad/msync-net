@@ -60,7 +60,8 @@ def limit_amount_of_samples(parsed_features, data_params):
 
 def prepare_examples_for_classification(parsed_features, data_params):
     data = (parsed_features['signals'][0], parsed_features['signals'][1])
-    label = data_params['max_delay'] + parsed_features['delay'][0] - parsed_features['delay'][1]
+    label = tf.one_hot(tf.cast(parsed_features['delay'][0] - parsed_features['delay'][1] >= 0, tf.int32), 1)
+    # label = tf.one_hot(label, 2 * data_params['max_delay'])
     example = data, label
     return example
 
