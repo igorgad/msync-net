@@ -27,6 +27,12 @@ def load_audio(parsed_features, data_params):
     return parsed_features
 
 
+def copy_v0_to_vall(parsed_features):
+    num_signals = tf.shape(parsed_features['signals'])[0]
+    parsed_features['signals'] = tf.map_fn(lambda sig: parsed_features['signals'][0], tf.range(num_signals), dtype=tf.float32, infer_shape=False)
+    return parsed_features
+
+
 def scale_signals(parsed_features, data_params):
     def scale_signal(signal):
         sig = 2 * data_params['scale_value'] * (signal - tf.reduce_min(signal)) / (tf.reduce_max(signal) - tf.reduce_min(signal)) - data_params['scale_value']
@@ -91,6 +97,7 @@ def base_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat))  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: limit_amount_of_samples(feat, data_params))

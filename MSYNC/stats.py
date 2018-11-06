@@ -7,7 +7,7 @@ import tfmpl
 
 @tfmpl.figure_tensor
 def create_dtw_image(r):
-    idx = np.arange(0, r.shape[1], 32)
+    idx = np.arange(0, r.shape[1], 64)
     r1 = r[0, idx, :r.shape[-1] // 2]
     r2 = r[0, idx, r.shape[-1] // 2:]
     dist, cost, acc_cost, path = fastdtw(r1, r2, dist=lambda x, y: np.linalg.norm(np.power(x - y, 2), ord=1))

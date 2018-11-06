@@ -9,12 +9,13 @@ importlib.reload(dataset_interface)
 
 data_params = {'dataset_file': './data/BACH10/msync-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
-               'sample_rate': 44100//4,
-               'example_length': 44100//4,  # 1 second of resampled audio
-               'batch_size': 16,
-               'repeat': 10,
+               'sample_rate': 44100//8,
+               'example_length': 20480,
+               'batch_size': 8,
+               'repeat': 100000,
                'shuffle_buffer': 32,
-               'scale_value': 1.0
+               'scale_value': 1.0,
+               'max_delay': 20480 // 20
                }
 
 config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)
