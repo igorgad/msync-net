@@ -9,6 +9,20 @@ def stft_layer_func(signal, model_params):
     return stft
 
 
+def cost_matrix_func(signals):
+    def lin_norm(x, y):
+        return tf.norm(x - y, axis=-1)
+
+    os = tf.shape(signals)[-1] // 2
+    signal_1 = signals[:, :, 0:os]
+    signal_2 = signals[:, :, os:os + os]
+
+    mat = tf.map_fn(lambda ri: lin_norm(tf.expand_dims(signal_1[:, ri, :], axis=1), signal_2[:, :, :]), tf.range(tf.shape(signal_1)[1]), dtype=tf.float32)
+    mat = tf.transpose(mat, [1, 0, 2])
+    return mat
+
+
+
 def build_models(model_params):
     view1_in = tf.keras.Input(model_params['input_shape'])
     view2_in = tf.keras.Input(model_params['input_shape'])
@@ -16,10 +30,9 @@ def build_models(model_params):
     view1_middle_out, view1_end_out = build_stft_dnn_branch(view1_in, model_params)
     view2_middle_out, view2_end_out = build_stft_dnn_branch(view2_in, model_params)
     combined_output = tf.keras.layers.concatenate([view1_middle_out, view2_middle_out])
+    cost_mat = tf.keras.layers.Lambda(cost_matrix_func)(combined_output)
 
-    class_output = tf.keras.layers.BatchNormalization()(combined_output)
-    class_output = tf.keras.layers.CuDNNLSTM(512)(class_output)
-    class_output = tf.keras.layers.BatchNormalization()(class_output)
+    class_output = tf.keras.layers.BatchNormalization()(cost_mat)
     class_output = tf.keras.layers.Dense(512, activation='relu')(class_output)
     class_output = tf.keras.layers.BatchNormalization()(class_output)
     class_output = tf.keras.layers.Dense(model_params['num_classes'], activation='softmax')(class_output)
