@@ -16,8 +16,8 @@ model_params = {'stft_frame_length': 512,
                 'pre_train_lr': 0.0001,
                 'dctw_lr': 0.0001,
                 'class_lr': 0.0001,
-                'dctw_weights_file': './saved_models/dctw_%s_weights.h5' % logname,
-                'class_weights_file': './saved_models/class_%s_weights.h5' % logname,
+                'dctw_weights_file': './saved_models/%s_dctw_weights.h5' % logname,
+                'reg_weights_file': './saved_models/%s_reg_weights.h5' % logname,
                 'num_classes': 1  #2 * 10240 // 20
                 }
 
@@ -66,7 +66,7 @@ reg_st = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patie
 reg_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/class0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
 
 reg_model.summary()
-reg_model.load_weights(model_params['dctw_weights_file'], by_name=True)
+reg_model.load_weights(model_params['reg_weights_file'], by_name=True)
 reg_model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=tf.keras.optimizers.Adam(lr=model_params['class_lr'], clipnorm=1.0), metrics=['mean_squared_error'])
 reg_model.fit(ref_data, epochs=400, steps_per_epoch=10, validation_data=ref_data, validation_steps=10, callbacks=[reg_tb, reg_cp, reg_st])
 reg_model.save_weights(model_params['class_weights_file'])

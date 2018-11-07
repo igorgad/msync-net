@@ -39,7 +39,7 @@ class BaseModel:
         output = tf.keras.layers.BatchNormalization()(output)
         output = tf.keras.layers.Conv2D(32, (3, 3), activation='relu')(output)
         output = tf.keras.layers.BatchNormalization()(output)
-        output = tf.keras.layers.Flatten(output)
+        output = tf.keras.layers.Flatten()(output)
         output = tf.keras.layers.Dense(self.model_params['num_classes'], activation='linear')(output)
         self.reg_model = tf.keras.Model([self.v1_model.input, self.v2_model.input], output)
         return self.reg_model
