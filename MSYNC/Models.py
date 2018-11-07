@@ -128,8 +128,16 @@ def cost_matrix_func(signals):
     def lin_norm(x, y):
         return tf.norm(x - y, axis=-1)
 
+    def rkhs_norm(x, y, s=0.1):
+        return tf.norm(gkernel(x, y, s), axis=-1)
+
     os = tf.shape(signals)[-1] // 2
     mat = tf.map_fn(lambda ri: lin_norm(tf.expand_dims(signals[:, ri, 0:os], axis=1), signals[:, :, os:os + os]),tf.range(tf.shape(signals)[1]), dtype=tf.float32)
     mat = tf.expand_dims(tf.transpose(mat, [1, 0, 2]), axis=-1)
     mat.set_shape([signals.get_shape().as_list()[0], signals.get_shape().as_list()[1], signals.get_shape().as_list()[1], 1])
+    tf.summary.image('cost_mat', mat)
     return mat
+
+
+def gkernel(x, y, s):
+    return tf.divide(1.0,tf.sqrt(tf.multiply(tf.multiply(2.0,np.pi),s))) * tf.exp( tf.divide(tf.multiply(-1.0,tf.pow(tf.subtract(x,y), 2.0)),tf.multiply(2.0,tf.pow(s, 2.0))) )

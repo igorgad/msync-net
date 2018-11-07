@@ -12,7 +12,7 @@ logname = 'regression_stft_dnn_3sec_auto'
 model_params = {'stft_frame_length': 512,
                 'stft_frame_step': 1,
                 'input_shape': (20480,),
-                'outdim_size': 128,
+                'outdim_size': 32,
                 'pre_train_lr': 0.0001,
                 'dctw_lr': 0.0001,
                 'reg_lr': 0.0001,
@@ -45,11 +45,11 @@ if not os.path.isfile(model_params['dctw_weights_file']):
     dctw_data = dts.dctw_pipeline(data_params)
     dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
     dctw_st = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=1, mode='auto')
-    dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
+    dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw' % logname, histogram_freq=8, batch_size=data_params['batch_size'], write_images=True)
 
     dctw_model.summary()
     dctw_model.compile(loss=loss.cca_loss(model_params['outdim_size'], True), optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
-    dctw_model.fit(dctw_data, epochs=400, steps_per_epoch=20, validation_data=dctw_data, validation_steps=10, callbacks=[dctw_tb, dctw_cp, dctw_st])
+    dctw_model.fit(dctw_data, epochs=400, steps_per_epoch=25, validation_data=dctw_data, validation_steps=25, callbacks=[dctw_tb, dctw_cp, dctw_st])
     dctw_model.save_weights(model_params['dctw_weights_file'])
 
 
@@ -67,6 +67,6 @@ reg_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/reg' % logname, histo
 
 reg_model.summary()
 reg_model.load_weights(model_params['dctw_weights_file'], by_name=True)
-reg_model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=tf.keras.optimizers.Adam(lr=model_params['reg_lr'], clipnorm=1.0), metrics=['mean_squared_error'])
-reg_model.fit(ref_data, epochs=400, steps_per_epoch=10, validation_data=ref_data, validation_steps=10, callbacks=[reg_tb, reg_cp, reg_st])
+reg_model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=tf.keras.optimizers.Adam(lr=model_params['reg_lr'], clipnorm=1.0))
+reg_model.fit(ref_data, epochs=400, steps_per_epoch=25, validation_data=ref_data, validation_steps=25, callbacks=[reg_tb, reg_cp, reg_st])
 reg_model.save_weights(model_params['reg_weights_file'])
