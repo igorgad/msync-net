@@ -74,7 +74,7 @@ def prepare_examples_for_classification(parsed_features, data_params):
 
 def prepare_examples_for_regression(parsed_features, data_params):
     data = (parsed_features['signals'][0], parsed_features['signals'][1])
-    label = tf.divide(parsed_features['delay'][0] - parsed_features['delay'][1], data_params['max_delay'])
+    label = tf.expand_dims(tf.divide(parsed_features['delay'][0] - parsed_features['delay'][1], data_params['max_delay']), axis=-1)
     example = data, label
     return example
 

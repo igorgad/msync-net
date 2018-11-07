@@ -35,13 +35,16 @@ class BaseModel:
     def build_reg_model(self):
         cost_mat = tf.keras.layers.Lambda(cost_matrix_func, name='cost_mat')(self.dctw_model.output)
         output = tf.keras.layers.BatchNormalization()(cost_mat)
+        output = tf.keras.layers.MaxPooling2D(pool_size=(4, 4))(output)
+        output = tf.keras.layers.Conv2D(8, (5, 5), activation='relu')(output)
+        output = tf.keras.layers.MaxPooling2D(pool_size=(4, 4))(output)
+        output = tf.keras.layers.Conv2D(16, (3, 3), activation='relu')(output)
+        output = tf.keras.layers.MaxPooling2D(pool_size=(4, 4))(output)
         output = tf.keras.layers.Conv2D(32, (3, 3), activation='relu')(output)
-        output = tf.keras.layers.BatchNormalization()(output)
-        output = tf.keras.layers.Conv2D(32, (3, 3), activation='relu')(output)
-        output = tf.keras.layers.BatchNormalization()(output)
+        output = tf.keras.layers.MaxPooling2D(pool_size=(4, 4))(output)
         output = tf.keras.layers.Flatten()(output)
         output = tf.keras.layers.Dense(self.model_params['num_classes'], activation='linear')(output)
-        self.reg_model = tf.keras.Model([self.v1_model.input, self.v2_model.input], output)
+        self.reg_model = tf.keras.Model(self.dctw_model.input, output)
         return self.reg_model
 
 
@@ -127,4 +130,6 @@ def cost_matrix_func(signals):
 
     os = tf.shape(signals)[-1] // 2
     mat = tf.map_fn(lambda ri: lin_norm(tf.expand_dims(signals[:, ri, 0:os], axis=1), signals[:, :, os:os + os]),tf.range(tf.shape(signals)[1]), dtype=tf.float32)
-    return tf.expand_dims(tf.transpose(mat, [1, 0, 2]), axis=-1)
+    mat = tf.expand_dims(tf.transpose(mat, [1, 0, 2]), axis=-1)
+    mat.set_shape([signals.get_shape().as_list()[0], signals.get_shape().as_list()[1], signals.get_shape().as_list()[1], 1])
+    return mat

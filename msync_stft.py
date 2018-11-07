@@ -15,7 +15,7 @@ model_params = {'stft_frame_length': 512,
                 'outdim_size': 128,
                 'pre_train_lr': 0.0001,
                 'dctw_lr': 0.0001,
-                'class_lr': 0.0001,
+                'reg_lr': 0.0001,
                 'dctw_weights_file': './saved_models/%s_dctw_weights.h5' % logname,
                 'reg_weights_file': './saved_models/%s_reg_weights.h5' % logname,
                 'num_classes': 1  #2 * 10240 // 20
@@ -43,9 +43,9 @@ if not os.path.isfile(model_params['dctw_weights_file']):
     print('Training DCTW...')
     data_params['batch_size'] = 1
     dctw_data = dts.dctw_pipeline(data_params)
-    dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw0/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
+    dctw_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/dctw/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
     dctw_st = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=1, mode='auto')
-    dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
+    dctw_tb = stats.TensorBoardDTW(log_dir='./logs/%s/dctw' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
 
     dctw_model.summary()
     dctw_model.compile(loss=loss.cca_loss(model_params['outdim_size'], True), optimizer=tf.keras.optimizers.RMSprop(lr=model_params['dctw_lr'], clipnorm=1.0))
@@ -58,15 +58,15 @@ model.freeze_branch_models()
 reg_model = model.build_reg_model()
 
 # Classification Training
-print('Training Classifier...')
+print('Training Regressor...')
 data_params['batch_size'] = 1
 ref_data = dts.regression_pipeline(data_params)
-reg_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/class0/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
+reg_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/reg/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 reg_st = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=1, mode='auto')
-reg_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/class0' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
+reg_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/reg' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
 
 reg_model.summary()
-reg_model.load_weights(model_params['reg_weights_file'], by_name=True)
-reg_model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=tf.keras.optimizers.Adam(lr=model_params['class_lr'], clipnorm=1.0), metrics=['mean_squared_error'])
+reg_model.load_weights(model_params['dctw_weights_file'], by_name=True)
+reg_model.compile(loss=tf.keras.losses.mean_squared_error, optimizer=tf.keras.optimizers.Adam(lr=model_params['reg_lr'], clipnorm=1.0), metrics=['mean_squared_error'])
 reg_model.fit(ref_data, epochs=400, steps_per_epoch=10, validation_data=ref_data, validation_steps=10, callbacks=[reg_tb, reg_cp, reg_st])
-reg_model.save_weights(model_params['class_weights_file'])
+reg_model.save_weights(model_params['reg_weights_file'])
