@@ -66,8 +66,15 @@ def limit_amount_of_samples(parsed_features, data_params):
 
 def prepare_examples_for_classification(parsed_features, data_params):
     data = (parsed_features['signals'][0], parsed_features['signals'][1])
-    label = tf.one_hot(tf.cast(parsed_features['delay'][0] - parsed_features['delay'][1] >= 0, tf.int32), 1)
+    label = tf.one_hot(tf.cast(parsed_features['delay'][0] - parsed_features['delay'][1] >= 0, tf.int32), 1)  # Binary
     # label = tf.one_hot(label, 2 * data_params['max_delay'])
+    example = data, label
+    return example
+
+
+def prepare_examples_for_regression(parsed_features, data_params):
+    data = (parsed_features['signals'][0], parsed_features['signals'][1])
+    label = tf.divide(parsed_features['delay'][0] - parsed_features['delay'][1], data_params['max_delay'])
     example = data, label
     return example
 
@@ -128,5 +135,12 @@ def v2_pipeline(data_params):
 def softmax_pipeline(data_params):
     tfdataset = base_pipeline(data_params)
     tfdataset = tfdataset.map(lambda feat: prepare_examples_for_classification(feat, data_params))
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
+    return tfdataset
+
+
+def regression_pipeline(data_params):
+    tfdataset = base_pipeline(data_params)
+    tfdataset = tfdataset.map(lambda feat: prepare_examples_for_regression(feat, data_params))
     tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
     return tfdataset

@@ -22,7 +22,6 @@ def cost_matrix_func(signals):
     return mat
 
 
-
 def build_models(model_params):
     view1_in = tf.keras.Input(model_params['input_shape'])
     view2_in = tf.keras.Input(model_params['input_shape'])

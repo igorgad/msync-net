@@ -6,7 +6,7 @@ import tfmpl
 
 
 @tfmpl.figure_tensor
-def create_dtw_image(r):
+def compute_dtw_and_create_image(r):
     idx = np.arange(0, r.shape[1], 64)
     r1 = r[0, idx, :r.shape[-1] // 2]
     r2 = r[0, idx, r.shape[-1] // 2:]
@@ -27,4 +27,4 @@ class TensorBoardDTW(tf.keras.callbacks.TensorBoard):
 
     def _make_histogram_ops(self, model):
         super(TensorBoardDTW, self)._make_histogram_ops(model)
-        tf.summary.image('dtw-cost', create_dtw_image(model.output))
+        tf.summary.image('dtw-cost', compute_dtw_and_create_image(model.get_layer('con_dctw').output))
