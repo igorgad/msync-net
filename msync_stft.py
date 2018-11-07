@@ -7,7 +7,7 @@ import MSYNC.stats as stats
 from MSYNC.Models import STFTModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-logname = 'stft_dnn_classification_r3sec_AUTO'
+logname = 'regression_stft_dnn_3sec_auto'
 
 model_params = {'stft_frame_length': 512,
                 'stft_frame_step': 1,
