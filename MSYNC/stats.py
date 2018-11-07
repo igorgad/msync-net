@@ -15,16 +15,6 @@ class TensorBoardDTW(tf.keras.callbacks.TensorBoard):
         tf.summary.image('dtw-cost', compute_dtw_and_create_image(model.get_layer('con_dctw').output))
 
 
-class TensorBoardCMAT(tf.keras.callbacks.TensorBoard):
-    def __init__(self, **kwargs):
-        super(TensorBoardCMAT, self).__init__(**kwargs)
-        self.dtw_image_summary = None
-
-    def _make_histogram_ops(self, model):
-        super(TensorBoardCMAT, self)._make_histogram_ops(model)
-        tf.summary.image('cost-mat', create_cmat_image(model.get_layer('cost_mat').output))
-
-
 @tfmpl.figure_tensor
 def compute_dtw_and_create_image(r):
     idx = np.arange(0, r.shape[1], 32)
@@ -37,12 +27,4 @@ def compute_dtw_and_create_image(r):
     ax.imshow(cost.T, origin='lower', cmap='gray', interpolation='nearest')
     ax.plot(path[0], path[1], 'w')
     ax.set_title('dist = ' + str(dist))
-    return fig
-
-
-@tfmpl.figure_tensor
-def create_cmat_image(r):
-    fig = tfmpl.create_figure(figsize=(4, 4))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.imshow(r[0, :, :, 0], origin='lower', cmap='gray', interpolation='nearest')
     return fig

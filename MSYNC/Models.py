@@ -135,6 +135,7 @@ def cost_matrix_func(signals):
     mat = tf.map_fn(lambda ri: lin_norm(tf.expand_dims(signals[:, ri, 0:os], axis=1), signals[:, :, os:os + os]),tf.range(tf.shape(signals)[1]), dtype=tf.float32)
     mat = tf.expand_dims(tf.transpose(mat, [1, 0, 2]), axis=-1)
     mat.set_shape([signals.get_shape().as_list()[0], signals.get_shape().as_list()[1], signals.get_shape().as_list()[1], 1])
+    tf.summary.image('cost_mat', mat)
     return mat
 
 
