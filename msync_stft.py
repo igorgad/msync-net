@@ -63,7 +63,7 @@ data_params['batch_size'] = 1
 ref_data = dts.regression_pipeline(data_params)
 reg_cp = tf.keras.callbacks.ModelCheckpoint('./logs/%s/reg/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 reg_st = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=1, mode='auto')
-reg_tb = tf.keras.callbacks.TensorBoard(log_dir='./logs/%s/reg' % logname, histogram_freq=4, batch_size=data_params['batch_size'], write_images=True)
+reg_tb = stats.TensorBoardCMAT(log_dir='./logs/%s/reg' % logname, histogram_freq=8, batch_size=data_params['batch_size'], write_images=True)
 
 reg_model.summary()
 reg_model.load_weights(model_params['dctw_weights_file'], by_name=True)
