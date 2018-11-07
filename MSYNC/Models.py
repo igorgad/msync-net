@@ -54,41 +54,37 @@ class STFTModel(BaseModel):
         return self.build_dnn_branch_model()
 
     def build_lstm_branch_model(self):
+        model_params = self.model_params
         input = tf.keras.Input(self.model_params['input_shape'])
-        stft = tf.keras.layers.Lambda(lambda signal: self.stft_layer_func(signal))(input)
+        stft = tf.keras.layers.Lambda(lambda signal: stft_layer_func(signal, model_params))(input)
 
         output = tf.keras.layers.BatchNormalization()(stft)
-        output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(self.model_params['outdim_size'], return_sequences=True))(output)
+        output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(output)
         output = tf.keras.layers.BatchNormalization()(output)
-        output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(self.model_params['outdim_size'], return_sequences=True))(output)
+        output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(output)
         output = tf.keras.layers.BatchNormalization()(output)
-        output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(self.model_params['outdim_size'], return_sequences=True))(output)
+        output = tf.keras.layers.Bidirectional(tf.keras.layers.CuDNNLSTM(model_params['outdim_size'], return_sequences=True))(output)
         output = tf.keras.layers.BatchNormalization()(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(2 * self.model_params['outdim_size'], activation='sigmoid'))(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(2 * model_params['outdim_size'], activation='sigmoid'))(output)
         output = tf.keras.layers.BatchNormalization()(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params['outdim_size'], activation='linear'))(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(model_params['outdim_size'], activation='linear'))(output)
 
         model = tf.keras.Model(input, output)
         return model
 
     def build_dnn_branch_model(self):
+        model_params = self.model_params
         input = tf.keras.Input(self.model_params['input_shape'])
-        stft = tf.keras.layers.Lambda(lambda signal: self.stft_layer_func(signal))(input)
+        stft = tf.keras.layers.Lambda(lambda signal: stft_layer_func(signal, model_params))(input)
 
         output = tf.keras.layers.BatchNormalization()(stft)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1024, activation='sigmoid'))(tf.keras.layers.BatchNormalization()(output))
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1024, activation='sigmoid'))(tf.keras.layers.BatchNormalization()(output))
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1024, activation='sigmoid'))(tf.keras.layers.BatchNormalization()(output))
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params['outdim_size'], activation='linear'))(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(model_params['outdim_size'], activation='linear'))(output)
 
         model = tf.keras.Model(input, output)
         return model
-
-    def stft_layer_func(self, signal):
-        with tf.device('/device:GPU:0'):
-            stft = tf.abs(tf.contrib.signal.stft(signal, self.model_params['stft_frame_length'], self.model_params['stft_frame_step'], pad_end=True))
-            tf.summary.image('stft', tf.expand_dims(stft, -1))
-        return stft
 
 
 class GFNNModel(BaseModel):
@@ -116,6 +112,13 @@ class GFNNModel(BaseModel):
 
         model = tf.keras.Model(input, output)
         return model
+
+
+def stft_layer_func(signal, model_params):
+    with tf.device('/device:GPU:0'):
+        stft = tf.abs(tf.contrib.signal.stft(signal, model_params['stft_frame_length'], model_params['stft_frame_step'], pad_end=True))
+        tf.summary.image('stft', tf.expand_dims(stft, -1))
+    return stft
 
 
 def cost_matrix_func(signals):
