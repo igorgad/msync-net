@@ -42,6 +42,11 @@ def scale_signals(parsed_features, data_params):
     return parsed_features
 
 
+def select_example_to_apply_delay(parsed_features, ratio=0.5):
+    parsed_features['apply_delay'] = tf.random_uniform([1], 1, 100, dtype=tf.float32)[0] < ratio * 100
+    return parsed_features
+
+
 def add_random_delay(parsed_features, data_params):
     num_signals = tf.shape(parsed_features['signals'])[0]
     delay = tf.random_uniform([num_signals], 1, data_params['max_delay'], dtype=tf.int32)
@@ -50,7 +55,7 @@ def add_random_delay(parsed_features, data_params):
         return tf.concat([tf.zeros(delay[signal_index], dtype=tf.float32), parsed_features['signals'][signal_index, 0:-delay[signal_index]]], axis=0)
 
     parsed_features['delay'] = delay
-    parsed_features['signals'] = tf.map_fn(add_delay, tf.range(num_signals), dtype=tf.float32, infer_shape=False)
+    parsed_features['signals'] = tf.where(parsed_features['apply_delay'], tf.map_fn(add_delay, tf.range(num_signals), dtype=tf.float32, infer_shape=False), parsed_features['signals'])
     return parsed_features
 
 
@@ -64,38 +69,16 @@ def limit_amount_of_samples(parsed_features, data_params):
     return parsed_features
 
 
-def prepare_examples_for_classification(parsed_features, data_params):
+def prepare_examples(parsed_features):
     data = (parsed_features['signals'][0], parsed_features['signals'][1])
-    label = tf.one_hot(tf.cast(parsed_features['delay'][0] - parsed_features['delay'][1] >= 0, tf.int32), 1)  # Binary
-    # label = tf.one_hot(label, 2 * data_params['max_delay'])
-    example = data, label
-    return example
-
-
-def prepare_examples_for_regression(parsed_features, data_params):
-    data = (parsed_features['signals'][0], parsed_features['signals'][1])
-    label = tf.expand_dims(tf.divide(parsed_features['delay'][0] - parsed_features['delay'][1], data_params['max_delay']), axis=-1)
-    example = data, label
-    return example
-
-
-def prepare_examples_for_dctw(parsed_features):
-    data = (parsed_features['signals'][0], parsed_features['signals'][1])
-    labels = tf.zeros_like(parsed_features['signals'][0])
+    labels = tf.cast(tf.logical_not(parsed_features['apply_delay']), tf.int32)
     example = data, labels
     return example
 
 
-def prepare_examples_for_v1(parsed_features):
+def prepare_examples_v0(parsed_features):
     data = parsed_features['signals'][0]
-    labels = data
-    example = data, labels
-    return example
-
-
-def prepare_examples_for_v2(parsed_features):
-    data = parsed_features['signals'][1]
-    labels = data
+    labels = 1
     example = data, labels
     return example
 
@@ -106,41 +89,20 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat))  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: select_example_to_apply_delay(feat))
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: limit_amount_of_samples(feat, data_params))
     return tfdataset
 
 
-def dctw_pipeline(data_params):
+def pipeline(data_params):
     tfdataset = base_pipeline(data_params)
-    tfdataset = tfdataset.map(prepare_examples_for_dctw)
+    tfdataset = tfdataset.map(prepare_examples)
     tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
     return tfdataset
 
-
-def v1_pipeline(data_params):
+def pipeline_v0(data_params):
     tfdataset = base_pipeline(data_params)
-    tfdataset = tfdataset.map(prepare_examples_for_v1)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
-    return tfdataset
-
-
-def v2_pipeline(data_params):
-    tfdataset = base_pipeline(data_params)
-    tfdataset = tfdataset.map(prepare_examples_for_v2)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
-    return tfdataset
-
-
-def softmax_pipeline(data_params):
-    tfdataset = base_pipeline(data_params)
-    tfdataset = tfdataset.map(lambda feat: prepare_examples_for_classification(feat, data_params))
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
-    return tfdataset
-
-
-def regression_pipeline(data_params):
-    tfdataset = base_pipeline(data_params)
-    tfdataset = tfdataset.map(lambda feat: prepare_examples_for_regression(feat, data_params))
+    tfdataset = tfdataset.map(prepare_examples_v0)
     tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
     return tfdataset
