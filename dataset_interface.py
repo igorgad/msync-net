@@ -70,15 +70,8 @@ def limit_amount_of_samples(parsed_features, data_params):
 
 
 def prepare_examples(parsed_features):
-    data = (parsed_features['signals'][0], parsed_features['signals'][1])
+    data = {'v1input': parsed_features['signals'][0], 'v2input': parsed_features['signals'][1]}
     labels = tf.cast(tf.logical_not(parsed_features['apply_delay']), tf.int32)
-    example = data, labels
-    return example
-
-
-def prepare_examples_v0(parsed_features):
-    data = parsed_features['signals'][0]
-    labels = 1
     example = data, labels
     return example
 
@@ -98,11 +91,5 @@ def base_pipeline(data_params):
 def pipeline(data_params):
     tfdataset = base_pipeline(data_params)
     tfdataset = tfdataset.map(prepare_examples)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
-    return tfdataset
-
-def pipeline_v0(data_params):
-    tfdataset = base_pipeline(data_params)
-    tfdataset = tfdataset.map(prepare_examples_v0)
     tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['batch_size']).prefetch(4)
     return tfdataset

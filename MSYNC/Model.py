@@ -8,20 +8,24 @@ class MSYNCModel:
         self.input_shape = input_shape
         self.model = None
 
-    def build_single_branch_model(self, name='branch'):
-        input = tf.keras.Input(self.input_shape)
+    def build_single_branch_model(self, name=''):
+        input = tf.keras.Input(self.input_shape, name=name+'input')
         logmel = LogMel()(input)
-        vggout = vggish(input_shape=(96, 64, 1), trainable=False)(logmel)
+        vggout = vggish(logmel, trainable=False, name=name)
         output = tf.keras.layers.Dense(128)(vggout)
         output = tf.keras.layers.LeakyReLU(alpha=0.3)(output)
         output = tf.keras.layers.Dense(64)(output)
-        return tf.keras.Model(input, output)
+
+        model = tf.keras.Model(input, output, name=name)
+        model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
+        model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
+        return model
 
     def build_model(self):
-        v1_model = self.build_single_branch_model()
-        v2_model = self.build_single_branch_model()
+        v1_model = self.build_single_branch_model('v1')
+        v2_model = self.build_single_branch_model('v2')
 
-        ecl_distance = tf.keras.layers.Lambda(euclidean_distance, output_shape=eucl_dist_output_shape)([v1_model.output, v2_model.output])
+        ecl_distance = tf.keras.layers.Lambda(euclidean_distance, output_shape=eucl_dist_output_shape, name='EclDistance')([v1_model.output, v2_model.output])
         self.model = tf.keras.Model([v1_model.input, v2_model.input], ecl_distance)
         return self.model
 
@@ -32,13 +36,14 @@ class LogMel(tf.keras.layers.Layer):
         super(LogMel, self).__init__(**kwargs)
 
     def call(self, inputs, *args, **kwargs):
-        inputs = tf.convert_to_tensor(inputs)
+        with tf.device('/device:GPU:0'):
+            inputs = tf.convert_to_tensor(inputs)
 
-        stft = tf.abs(tf.contrib.signal.stft(inputs, 400, 160, pad_end=True))
-        mel = tf.tensordot(stft, self.mel_matrix, 1)
-        mel.set_shape(stft.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
-        mel_log = tf.log(mel + 0.01)
-        mel_log = tf.expand_dims(mel_log, -1)
+            stft = tf.abs(tf.contrib.signal.stft(inputs, 400, 160, pad_end=True))
+            mel = tf.tensordot(stft, self.mel_matrix, 1)
+            mel.set_shape(stft.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
+            mel_log = tf.log(mel + 0.01)
+            mel_log = tf.expand_dims(mel_log, -1)
 
         tf.summary.image('logmel', mel_log)
         return mel_log
