@@ -66,8 +66,10 @@ class LogMel(tf.keras.layers.Layer):
 
 
 def euclidean_distance(vectors):
-    x, y = vectors
-    return tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=1, keepdims=True), tf.keras.backend.epsilon()))
+    with tf.device('/device:GPU:0'):
+        x, y = vectors
+        distance = tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=1, keepdims=True), tf.keras.backend.epsilon()))
+    return distance
 
 
 def eucl_dist_output_shape(shapes):

@@ -2,6 +2,7 @@
 import tensorflow as tf
 import numpy as np
 import os
+import scipy.io.wavfile as wave
 
 
 data_root = './data/BACH10/'
@@ -31,13 +32,16 @@ fs_audio_dir = os.fsencode(audio_dir)
 for folder in os.listdir(fs_audio_dir):
     files = sorted(os.listdir(fs_audio_dir + folder))
     instruments = []
+    signals = []
 
     for file in files:
         instruments.append(file.split(b'.wav')[0].split(b'-')[-1])
+        signals.append(np.float32(wave.read(fs_audio_dir + folder + b'/' + file)[1]).tostring())
 
     tf_example = tf.train.Example(features=tf.train.Features(feature={'folder': bytes_feature([folder]),
                                                                       'files': bytes_feature(files),
-                                                                      'instruments': bytes_feature(instruments)
+                                                                      'instruments': bytes_feature(instruments),
+                                                                      'signals': bytes_feature(signals)
                                                                       }))
 
     writer.write(tf_example.SerializeToString())

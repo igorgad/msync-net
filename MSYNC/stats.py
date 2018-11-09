@@ -1,30 +1,22 @@
 
 import tensorflow as tf
 import numpy as np
-from dtw import fastdtw
 import tfmpl
 
 
-class TensorBoardDTW(tf.keras.callbacks.TensorBoard):
-    def __init__(self, **kwargs):
-        super(TensorBoardDTW, self).__init__(**kwargs)
-        self.dtw_image_summary = None
-
-    def _make_histogram_ops(self, model):
-        super(TensorBoardDTW, self)._make_histogram_ops(model)
-        tf.summary.image('dtw-cost', compute_dtw_and_create_image(model.get_layer('con_dctw').output))
-
-
 @tfmpl.figure_tensor
-def compute_dtw_and_create_image(r):
-    idx = np.arange(0, r.shape[1], 32)
-    r1 = r[0, idx, :r.shape[-1] // 2]
-    r2 = r[0, idx, r.shape[-1] // 2:]
-    dist, cost, acc_cost, path = fastdtw(r1, r2, dist=lambda x, y: np.linalg.norm(np.power(x - y, 2), ord=1))
-
+def create_ave_image(ecl_distance):
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)
-    ax.imshow(cost.T, origin='lower', cmap='gray', interpolation='nearest')
-    ax.plot(path[0], path[1], 'w')
-    ax.set_title('dist = ' + str(dist))
+    ax.plot(ecl_distance)
+    # ax.set_title('dist = ' + str(dist))
     return fig
+
+
+class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
+    def __init__(self, **kwargs):
+        super(TensorBoardAVE, self).__init__(**kwargs)
+
+    def _make_histogram_ops(self, model):
+        super(TensorBoardAVE, self)._make_histogram_ops(model)
+        tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('EclDistance').output))
