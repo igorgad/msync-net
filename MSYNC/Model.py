@@ -25,7 +25,7 @@ class MSYNCModel:
         v1_model = self.build_single_branch_model('v1')
         v2_model = self.build_single_branch_model('v2')
 
-        ecl_distance = tf.keras.layers.Lambda(euclidean_distance, output_shape=eucl_dist_output_shape, name='EclDistance')([v1_model.output, v2_model.output])
+        ecl_distance = EclDistance()([v1_model.output, v2_model.output])
         self.model = tf.keras.Model([v1_model.input, v2_model.input], ecl_distance)
         return self.model
 
@@ -65,13 +65,20 @@ class LogMel(tf.keras.layers.Layer):
         return input_shape[0], input_shape[1], tf.shape(self.mel_matrix)[-1], 1
 
 
-def euclidean_distance(vectors):
-    with tf.device('/device:GPU:0'):
-        x, y = vectors
-        distance = tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=1, keepdims=True), tf.keras.backend.epsilon()))
-    return distance
+class EclDistance(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        self.mel_matrix = None
+        super(EclDistance, self).__init__(**kwargs)
 
+    def call(self, inputs, *args, **kwargs):
+        with tf.device('/device:GPU:0'):
+            x, y = inputs
+            distance = tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=1, keepdims=True), tf.keras.backend.epsilon()))
+        return distance
 
-def eucl_dist_output_shape(shapes):
-    shape1, shape2 = shapes
-    return [shape1[0], 1]
+    def build(self, input_shape):
+        super(EclDistance, self).build(input_shape)  # Be sure to call this at the end
+
+    def compute_output_shape(self, input_shape):
+        shape1, shape2 = input_shape
+        return [shape1[0], 1]

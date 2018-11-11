@@ -8,7 +8,8 @@ import tfmpl
 def create_ave_image(ecl_distance):
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)
-    ax.plot(ecl_distance)
+    # ax.set_ylim(0.0, 1.0)
+    ax.plot(np.arange(-ecl_distance.shape[0] // 2, ecl_distance.shape[0] // 2), ecl_distance)
     # ax.set_title('dist = ' + str(dist))
     return fig
 
@@ -19,4 +20,4 @@ class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
 
     def _make_histogram_ops(self, model):
         super(TensorBoardAVE, self)._make_histogram_ops(model)
-        tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('EclDistance').output))
+        tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('ecl_distance').output))
