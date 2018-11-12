@@ -81,13 +81,13 @@ def sequential_batch(parsed_features, data_params):
     widx_max = tf.reduce_min(tf.map_fn(lambda sig: tf.shape(sig)[0], parsed_features['signals'], dtype=tf.int32, infer_shape=False))
     widx_beg = tf.random_uniform([1], 0, widx_max - data_params['sequential_batch_size'], dtype=tf.int32)[0]
     widx = tf.range(widx_beg, widx_beg + data_params['sequential_batch_size'])
-    widx_mid = tf.ones(data_params['sequential_batch_size'], dtype=tf.int32) * (widx[0] + widx[-1]) // 2
+    widx_mid = tf.ones(data_params['sequential_batch_size'], dtype=tf.int32) * ((widx[0] + widx[-1]) // 2 + 1)
     parsed_features['signals'] = tf.map_fn(lambda sigid: tf.where(tf.equal(sigid, 0),
                                                                   tf.gather(parsed_features['signals'][sigid], widx_mid, axis=0),
                                                                   tf.gather(parsed_features['signals'][sigid], widx, axis=0)),
                                         tf.range(num_sig), dtype=tf.float32)
 
-    parsed_features['apply_delay'] = tf.one_hot([widx_mid[0] - widx[0]], data_params['sequential_batch_size'], on_value=False, off_value=True, dtype=tf.bool)
+    parsed_features['apply_delay'] = tf.one_hot([widx_mid[0] - widx[0]], data_params['sequential_batch_size'], on_value=False, off_value=True, dtype=tf.bool)[0]
     return parsed_features
 
 
@@ -102,15 +102,15 @@ def train_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4).cache()
-    tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
+#     tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: select_example_to_apply_delay(feat), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
 
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer'])
-    tfdataset = tfdataset.map(lambda feat: random_batch(feat, data_params), num_parallel_calls=4).batch(data_params['random_batch_size'])
+    tfdataset = tfdataset.map(lambda feat: random_batch(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(prepare_examples, num_parallel_calls=4)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
     return tfdataset
 
 
@@ -118,13 +118,13 @@ def test_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4).cache()
-    tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
+#     tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     # tfdataset = tfdataset.map(lambda feat: select_example_to_apply_delay(feat), num_parallel_calls=4)
     # tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
 
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer'])
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(prepare_examples, num_parallel_calls=4)
+    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer'])
     return tfdataset

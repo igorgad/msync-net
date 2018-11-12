@@ -11,8 +11,12 @@ class MSYNCModel:
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(self.input_shape, name=name+'input')
         logmel = LogMel()(input)
+        
         vggout = vggish(logmel, trainable=False, name=name)
-        output = tf.keras.layers.Dense(128)(vggout)
+        
+        output = tf.keras.layers.BatchNormalization()(vggout)
+        output = tf.keras.layers.Dense(128)(output)
+        output = tf.keras.layers.BatchNormalization()(output)
         output = tf.keras.layers.LeakyReLU(alpha=0.3)(output)
         output = tf.keras.layers.Dense(64)(output)
 
