@@ -36,14 +36,13 @@ class LogMel(tf.keras.layers.Layer):
         super(LogMel, self).__init__(**kwargs)
 
     def call(self, inputs, *args, **kwargs):
-        with tf.device('/device:GPU:0'):
-            inputs = tf.convert_to_tensor(inputs)
+        inputs = tf.convert_to_tensor(inputs)
 
-            stft = tf.abs(tf.contrib.signal.stft(inputs, 400, 160, pad_end=True))
-            mel = tf.tensordot(stft, self.mel_matrix, 1)
-            mel.set_shape(stft.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
-            mel_log = tf.log(mel + 0.01)
-            mel_log = tf.expand_dims(mel_log, -1)
+        stft = tf.abs(tf.contrib.signal.stft(inputs, 400, 160, pad_end=True))
+        mel = tf.tensordot(stft, self.mel_matrix, 1)
+        mel.set_shape(stft.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
+        mel_log = tf.log(mel + 0.01)
+        mel_log = tf.expand_dims(mel_log, -1)
 
         tf.summary.image('logmel', mel_log)
         return mel_log
@@ -65,20 +64,48 @@ class LogMel(tf.keras.layers.Layer):
         return input_shape[0], input_shape[1], tf.shape(self.mel_matrix)[-1], 1
 
 
-class EclDistance(tf.keras.layers.Layer):
+class EclDistanceMat(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         self.mel_matrix = None
-        super(EclDistance, self).__init__(**kwargs)
+        super(EclDistanceMat, self).__init__(**kwargs)
+
+    def distance(self, x, y):
+        return tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=-1, keepdims=True), tf.keras.backend.epsilon()))
 
     def call(self, inputs, *args, **kwargs):
-        with tf.device('/device:GPU:0'):
-            x, y = inputs
-            distance = tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=1, keepdims=True), tf.keras.backend.epsilon()))
-        return distance
+        x, y = inputs
+        mat = tf.map_fn(lambda ri: self.distance(tf.expand_dims(x[:, ri, :], axis=1), y[:, :, :]), tf.range(tf.shape(x)[1]), dtype=tf.float32)
+        mat = tf.transpose(mat, [1, 0, 2, 3])
+        tf.summary.image('ecldist_mat', mat)
+        return mat
 
     def build(self, input_shape):
-        super(EclDistance, self).build(input_shape)  # Be sure to call this at the end
+        super(EclDistanceMat, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
         shape1, shape2 = input_shape
-        return [shape1[0], 1]
+        return [shape1[0], shape1[1], shape2[1], 1]
+
+
+class DiagMean(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        self.mel_matrix = None
+        super(DiagMean, self).__init__(**kwargs)
+
+    def diag_mean(self, mat, diagi):
+        nx = tf.range(start=tf.abs(tf.minimum(0, diagi)), limit=tf.subtract(tf.shape(mat)[1] - 1, tf.abs(diagi)))
+        ny = tf.add(nx, diagi)
+        indices = [tf.concat([tf.expand_dims(nx, -1), tf.expand_dims(ny, -1)], axis=1)]
+        return tf.reduce_mean(tf.gather_nd(mat, indices))
+
+    def call(self, inputs, *args, **kwargs):
+        num_time_steps = tf.shape(inputs)[1]
+        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps, num_time_steps), dtype=tf.float32)
+        return mean
+
+    def build(self, input_shape):
+        super(DiagMean, self).build(input_shape)  # Be sure to call this at the end
+
+    # def compute_output_shape(self, input_shape):
+    #     shape1, shape2 = input_shape
+    #     return [shape1[0], shape1[1], shape2[1], 1]
