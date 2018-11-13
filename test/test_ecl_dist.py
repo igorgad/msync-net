@@ -1,7 +1,7 @@
 
 import tensorflow as tf
 import numpy as np
-from MSYNC.Model import EclDistanceMat
+from MSYNC.Model import EclDistanceMat, DiagMean
 import dataset_interface
 import matplotlib.pyplot as plt
 
@@ -13,6 +13,7 @@ ksiga = tf.keras.Input(shape=(32, 64))
 ksigb = tf.keras.Input(shape=(32, 64))
 
 dist_mat = EclDistanceMat()([ksiga, ksigb])
+dist_mean = DiagMean()(dist_mat)
 
-md = tf.keras.Model([ksiga, ksigb], dist_mat)
+md = tf.keras.Model([ksiga, ksigb], [dist_mat, dist_mean])
 r = md.predict([siga, sigb])
