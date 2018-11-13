@@ -8,7 +8,7 @@ import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-logname = 'avenet_logmel_difftest_lrs'
+logname = 'avenet_logmel_difftest_lrs_trainvgg'
 
 train_params = {'lr': 0.001,
                 'weights_file': './saved_models/%s_dctw_weights.h5' % logname,
@@ -39,8 +39,9 @@ checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=4, batch_size=data_params['sequential_batch_size'], write_images=True)
 lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(0.1, np.floor((1 + epoch) / 5))) # Drop = 0.1, epoch_drop = 5
+callbacks = [checkpoint, tensorboard, early_stop, lr_scheduler]
 
 model.summary()
 model.compile(loss=loss.contrastive_loss, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=[loss.min_ecl_distance_accuracy])
-model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=val_data, validation_steps=25, callbacks=[checkpoint, tensorboard, lr_scheduler])
+model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=val_data, validation_steps=25, callbacks=callbacks)
 model.save_weights(train_params['weights_file'])

@@ -12,7 +12,7 @@ class MSYNCModel:
         input = tf.keras.Input(self.input_shape, name=name+'input')
         logmel = LogMel()(input)
         
-        vggout = vggish(logmel, trainable=False, name=name)
+        vggout = vggish(logmel, trainable=True, name=name)
         
         output = tf.keras.layers.BatchNormalization()(vggout)
         output = tf.keras.layers.Dense(128)(output)
