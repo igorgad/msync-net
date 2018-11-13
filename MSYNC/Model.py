@@ -14,7 +14,9 @@ class MSYNCModel:
 
         vggout = vggish(logmel, trainable=False, name=name)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128))(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization())(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128))(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization())(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.LeakyReLU(alpha=0.3))(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64))(output)
 

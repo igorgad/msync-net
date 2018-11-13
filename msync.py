@@ -10,7 +10,7 @@ from MSYNC.Model import MSYNCModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 logname = 'td_mwaynet_logmel_autotest'
 
-train_params = {'lr': 0.01,
+train_params = {'lr': 0.001,
                 'weights_file': './saved_models/%s_dctw_weights.h5' % logname,
                 }
 
@@ -18,7 +18,7 @@ data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 16,
+               'random_batch_size': 1,
                'sequential_batch_size': 16,
                'repeat': 100000,
                'shuffle_buffer': 32,

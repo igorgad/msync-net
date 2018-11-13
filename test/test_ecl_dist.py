@@ -14,6 +14,7 @@ ksigb = tf.keras.Input(shape=(32, 64))
 
 dist_mat = EclDistanceMat()([ksiga, ksigb])
 dist_mean = DiagMean()(dist_mat)
+dist_max = tf.keras.layers.Softmax()(dist_mean)
 
-md = tf.keras.Model([ksiga, ksigb], [dist_mat, dist_mean])
+md = tf.keras.Model([ksiga, ksigb], [dist_mat, dist_mean, dist_max])
 r = md.predict([siga, sigb])
