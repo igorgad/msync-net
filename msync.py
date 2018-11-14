@@ -18,9 +18,8 @@ data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 1,
+               'random_batch_size': 8,
                'sequential_batch_size': 16,
-               'repeat': 100000,
                'shuffle_buffer': 32,
                'scale_value': 1.0,
                'max_delay': 4 * 15360
@@ -41,6 +40,6 @@ lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_para
 callbacks = [checkpoint, tensorboard, early_stop, lr_scheduler]
 
 model.summary()
-model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']))
+model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy'])
 model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=train_data, validation_steps=25, callbacks=callbacks)
 model.save_weights(train_params['weights_file'])

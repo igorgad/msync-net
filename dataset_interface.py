@@ -70,6 +70,7 @@ def sequential_batch(parsed_features, data_params):
     widx_beg = tf.random_uniform([1], 0, widx_max - data_params['sequential_batch_size'], dtype=tf.int32)[0]
     widx = tf.range(widx_beg, widx_beg + data_params['sequential_batch_size'])
     parsed_features['signals'] = tf.map_fn(lambda sigid: tf.gather(parsed_features['signals'][sigid], widx, axis=0), tf.range(num_sig), dtype=tf.float32)
+    parsed_features['signals'].set_shape([4, data_params['sequential_batch_size'], data_params['example_length']])
     return parsed_features
 
 
@@ -91,5 +92,5 @@ def pipeline(data_params):
 
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.repeat(data_params['repeat']).shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
+    tfdataset = tfdataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
     return tfdataset
