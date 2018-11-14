@@ -29,9 +29,8 @@ class MSYNCModel:
         v1_model = self.build_single_branch_model('v1')
         v2_model = self.build_single_branch_model('v2')
 
-        ecl_mat_distance = EclDistanceMat()([v1_model.output, v2_model.output])
-        ecl_mean_distance = DiagMean()(ecl_mat_distance)
-        ecl_softmax = tf.keras.layers.Softmax()(ecl_mean_distance)
+        ecl_distance = EclDistance()([v1_model.output, v2_model.output])
+        ecl_softmax = tf.keras.layers.Softmax()(ecl_distance)
 
         self.model = tf.keras.Model([v1_model.input, v2_model.input], ecl_softmax)
         return self.model
@@ -71,51 +70,22 @@ class LogMel(tf.keras.layers.Layer):
         return tf.TensorShape((input_shape[0], input_shape[1] // 160, 64, 1))
 
 
-class EclDistanceMat(tf.keras.layers.Layer):
+class EclDistance(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         self.mel_matrix = None
-        super(EclDistanceMat, self).__init__(**kwargs)
+        super(EclDistance, self).__init__(**kwargs)
 
     def distance(self, x, y):
-        return tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=-1, keepdims=True), tf.keras.backend.epsilon()))
+        return
 
     def call(self, inputs, *args, **kwargs):
         x, y = inputs
-        mat = tf.map_fn(lambda ri: self.distance(tf.expand_dims(x[:, ri, :], axis=1), y[:, :, :]), tf.range(tf.shape(x)[1]), dtype=tf.float32)
-        mat = tf.transpose(mat, [1, 0, 2, 3])
-        mat.set_shape([inputs[0].shape[0], inputs[0].shape[1], inputs[1].shape[1], 1])
-        tf.summary.image('ecldist_mat', mat)
-        return mat
+        distance = tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=-1), tf.keras.backend.epsilon()))
+        return -distance
 
     def build(self, input_shape):
-        super(EclDistanceMat, self).build(input_shape)  # Be sure to call this at the end
+        super(EclDistance, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
         shape1, shape2 = input_shape
-        return tf.TensorShape((shape1[0], shape1[2], shape2[2], 1))
-
-
-class DiagMean(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
-        self.mel_matrix = None
-        super(DiagMean, self).__init__(**kwargs)
-
-    def diag_mean(self, mat, diagi):
-        nx = tf.range(start=tf.abs(tf.minimum(0, diagi)), limit=tf.subtract(tf.shape(mat)[1], tf.abs(tf.maximum(diagi, 0))))
-        ny = tf.add(nx, diagi)
-        flat_indices = ny * tf.shape(mat)[1] + nx
-        flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
-        return -1 * tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
-
-    def call(self, inputs, *args, **kwargs):
-        num_time_steps = tf.shape(inputs)[1]
-        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps//2 + 1, num_time_steps//2), dtype=tf.float32)
-        mean = tf.transpose(mean)
-        mean.set_shape([inputs.shape[0], inputs.shape[1]//2 + inputs.shape[2]//2 - 1])
-        return mean
-
-    def build(self, input_shape):
-        super(DiagMean, self).build(input_shape)  # Be sure to call this at the end
-
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1]//2 + input_shape[2]//2 - 1))
+        return tf.TensorShape((shape1[0], shape1[1]))

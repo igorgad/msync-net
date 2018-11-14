@@ -27,3 +27,12 @@ sess.run(tf.global_variables_initializer())
 ex = dataset_interface.pipeline(data_params)
 ex = ex.make_one_shot_iterator().get_next()
 r = sess.run(ex)
+
+v1 = r[0]['v1input'][0].reshape(-1)
+v2 = r[0]['v2input'][0].reshape(-1)
+l = v1.size//2 + (np.argmax(r[1][0]) - data_params['sequential_batch_size']//2) * data_params['example_length']
+
+plt.plot(v1)
+plt.plot(v2)
+plt.axvline(l)
+plt.axvline(l + data_params['example_length'])

@@ -69,14 +69,18 @@ def sequential_batch(parsed_features, data_params):
     widx_max = tf.reduce_min(tf.map_fn(lambda sig: tf.shape(sig)[0], parsed_features['signals'], dtype=tf.int32, infer_shape=False))
     widx_beg = tf.random_uniform([1], 0, widx_max - data_params['sequential_batch_size'], dtype=tf.int32)[0]
     widx = tf.range(widx_beg, widx_beg + data_params['sequential_batch_size'])
-    parsed_features['signals'] = tf.map_fn(lambda sigid: tf.gather(parsed_features['signals'][sigid], widx, axis=0), tf.range(num_sig), dtype=tf.float32)
+    widx_mid = tf.ones(data_params['sequential_batch_size'], dtype=tf.int32) * ((widx[0] + widx[-1]) // 2 + 1)
+    parsed_features['signals'] = tf.map_fn(lambda sigid: tf.where(tf.equal(sigid, 0),
+                                                                  tf.gather(parsed_features['signals'][sigid], widx_mid, axis=0),
+                                                                  tf.gather(parsed_features['signals'][sigid], widx, axis=0)),
+                                           tf.range(num_sig), dtype=tf.float32)
     parsed_features['signals'].set_shape([4, data_params['sequential_batch_size'], data_params['example_length']])
     return parsed_features
 
 
 def prepare_examples(parsed_features, data_params):
     data = {'v1input': parsed_features['signals'][0], 'v2input': parsed_features['signals'][1]}
-    labels = tf.one_hot(data_params['sequential_batch_size'] + (parsed_features['delay'][1] - parsed_features['delay'][0]) // data_params['example_length'], data_params['sequential_batch_size'] - 1)
+    labels = tf.one_hot(data_params['sequential_batch_size']//2 + (parsed_features['delay'][1] - parsed_features['delay'][0]) // data_params['example_length'], data_params['sequential_batch_size'])
     example = data, labels
     return example
 
