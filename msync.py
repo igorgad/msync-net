@@ -8,7 +8,7 @@ import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-logname = 'td_mwaynet_logmel_autotest'
+logname = 'td_mwaynet_logmel_difftest'
 
 train_params = {'lr': 0.0001,
                 'weights_file': './saved_models/%s_dctw_weights.h5' % logname,
