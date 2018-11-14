@@ -3,12 +3,12 @@ import os
 import tensorflow as tf
 import numpy as np
 import dataset_interface as dts
-import MSYNC.loss as loss
+import MSYNC.utils as utils
 import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-logname = 'mwaynet_logmel_autotest'
+logname = 'mwaynet_logmel_difftest'
 
 train_params = {'lr': 0.001,
                 'weights_file': './saved_models/%s_dctw_weights.h5' % logname,
@@ -40,6 +40,6 @@ lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_para
 callbacks = [checkpoint, tensorboard, early_stop, lr_scheduler]
 
 model.summary()
-model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy'])
+model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
 model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=train_data, validation_steps=25, callbacks=callbacks)
 model.save_weights(train_params['weights_file'])
