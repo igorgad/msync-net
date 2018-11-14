@@ -34,7 +34,7 @@ train_data = dts.pipeline(data_params)
 
 # Classification Training
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
-early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=20, verbose=1, mode='auto')
+early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=4, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=2, batch_size=data_params['random_batch_size'], write_images=True)
 lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(0.1, np.floor((1 + epoch) / 5))) # Drop = 0.1, epoch_drop = 5
 callbacks = [checkpoint, tensorboard, early_stop, lr_scheduler]
