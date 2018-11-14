@@ -101,17 +101,17 @@ class DiagMean(tf.keras.layers.Layer):
         super(DiagMean, self).__init__(**kwargs)
 
     def diag_mean(self, mat, diagi):
-        nx = tf.range(start=tf.abs(tf.minimum(0, diagi)), limit=tf.subtract(tf.shape(mat)[1], tf.abs(tf.maximum(diagi, 0))))
-        ny = tf.add(nx, diagi)
+        ny = tf.range(start=tf.abs(tf.minimum(0, diagi)), limit=tf.subtract(tf.shape(mat)[1] - 1, tf.abs(tf.maximum(diagi, 0))))
+        nx = tf.add(ny, diagi)
         flat_indices = ny * tf.shape(mat)[1] + nx
         flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
         return -1 * tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]
-        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps//2 + 1, num_time_steps//2), dtype=tf.float32)
+        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps//2, num_time_steps//2), dtype=tf.float32)
         mean = tf.transpose(mean)
-        mean.set_shape([inputs.shape[0], inputs.shape[1]//2 + inputs.shape[2]//2 - 1])
+        mean.set_shape([inputs.shape[0], inputs.shape[1]//2 + inputs.shape[2]//2])
         return mean
 
     def build(self, input_shape):

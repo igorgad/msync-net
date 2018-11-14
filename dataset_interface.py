@@ -76,7 +76,7 @@ def sequential_batch(parsed_features, data_params):
 
 def prepare_examples(parsed_features, data_params):
     data = {'v1input': parsed_features['signals'][0], 'v2input': parsed_features['signals'][1]}
-    labels = tf.one_hot(data_params['sequential_batch_size'] + (parsed_features['delay'][1] - parsed_features['delay'][0]) // data_params['example_length'], data_params['sequential_batch_size'] - 1)
+    labels = tf.one_hot(data_params['sequential_batch_size']//2 + (parsed_features['delay'][1] - parsed_features['delay'][0]) // data_params['example_length'], data_params['sequential_batch_size'])
     example = data, labels
     return example
 
