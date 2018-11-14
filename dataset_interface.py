@@ -89,7 +89,7 @@ def pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4).cache()
-    # tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
+    tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
