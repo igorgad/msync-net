@@ -30,7 +30,7 @@ msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data
 model = msync_model.build_model()
 
 # Get data pipelines
-train_data = dts.pipeline(data_params)
+train_data = dts.bach10_pipeline(data_params)
 
 # Classification Training
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
