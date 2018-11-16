@@ -8,15 +8,17 @@ import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-logname = 'tdmway_bach10'
 
 train_params = {'lr': 0.0001,
-                'weights_file': './saved_models/%s_dctw_weights.h5' % logname,
+                'drop_lr': 0.1,
+                'drop_epoch': 5
                 }
 
-data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
-               'audio_root': './data/BACH10/Audio',
-               'sample_rate': 16000,
+dataset = 'bach10'
+dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
+dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
+
+data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
                'random_batch_size': 16,  # For training
                'sequential_batch_size': 8,  # For validation
@@ -27,21 +29,24 @@ data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
                'instrument_2': 'clean electric guitar'  # Only valid for MedleyDB dataset
                }
 
+logname = 'tfmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()]) + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
+
 # Get Model
 msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
 model = msync_model.build_model()
 
 # Get data pipelines
-train_data = dts.bach10_pipeline(data_params)
+data_params['dataset_file'] = dataset_file
+data_params['audio_root'] = dataset_audio_root
+train_data, validation_data = dts.bach10_pipeline(data_params) if dataset == 'bach10' else dts.medleydb_pipeline(data_params)
 
 # Classification Training
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=4, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=2, batch_size=data_params['random_batch_size'], write_images=True)
-lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(0.1, np.floor((1 + epoch) / 5))) # Drop = 0.1, epoch_drop = 5
+lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(train_params['drop_lr'], np.floor((1 + epoch) / train_params['drop_epoch'])))
 callbacks = [checkpoint, tensorboard, early_stop, lr_scheduler]
 
 model.summary()
 model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
-model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=train_data, validation_steps=25, callbacks=callbacks)
-model.save_weights(train_params['weights_file'])
+model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)

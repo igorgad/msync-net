@@ -58,8 +58,10 @@ for file in sorted(os.listdir(fs_metadata_dir)):
     files = [os.fsencode(yml['stems']['S%.2d' % s]['filename']) for s in range(1, len(yml['stems']) + 1)]
     instruments = [ os.fsencode(yml['stems']['S%.2d' % s]['instrument']) for s in range(1, len(yml['stems']) + 1)]
     types = [os.fsencode(list(tps.keys())[np.nonzero([s.count(yml['stems']['S%.2d' % si]['instrument']) for s in tps.values()])[0][0]]) for si in range(1, len(yml['stems']) + 1)]
+    is_train = np.random.randint(100) < train_test_ratio * 100
 
     tf_example = tf.train.Example(features=tf.train.Features(feature={'folder': bytes_feature([folder]),
+                                                                      'is_train': int64_feature(np.int64(is_train)),
                                                                       'files': bytes_feature(files),
                                                                       'instruments': bytes_feature(instruments),
                                                                       'types': bytes_feature(types),

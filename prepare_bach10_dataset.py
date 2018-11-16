@@ -33,12 +33,14 @@ for folder in os.listdir(fs_audio_dir):
     files = sorted(os.listdir(fs_audio_dir + folder))
     instruments = []
     signals = []
+    is_train = np.random.randint(100) < train_test_ratio * 100
 
     for file in files:
         instruments.append(file.split(b'.wav')[0].split(b'-')[-1])
         signals.append(np.float32(wave.read(fs_audio_dir + folder + b'/' + file)[1]).tostring())
 
     tf_example = tf.train.Example(features=tf.train.Features(feature={'folder': bytes_feature([folder]),
+                                                                      'is_train': int64_feature(np.int64(is_train)),
                                                                       'files': bytes_feature(files),
                                                                       'instruments': bytes_feature(instruments),
                                                                       'signals': bytes_feature(signals)

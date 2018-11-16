@@ -24,6 +24,6 @@ config.gpu_options.allow_growth = True
 sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
-ex = dataset_interface.pipeline(data_params)
+ex = dataset_interface.bach10_pipeline(data_params)
 ex = ex.make_one_shot_iterator().get_next()
 r = sess.run(ex)

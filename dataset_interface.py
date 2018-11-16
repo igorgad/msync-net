@@ -6,6 +6,7 @@ import os
 
 features = {
         'folder': tf.VarLenFeature(tf.string),
+        'is_train': tf.FixedLenFeature(1, tf.int64),
         'files': tf.VarLenFeature(tf.string),
         'instruments': tf.VarLenFeature(tf.string),
         'types': tf.VarLenFeature(tf.string),
@@ -16,6 +17,7 @@ features = {
 def parse_features_and_decode(tf_example, features):
     parsed_features = tf.parse_single_example(tf_example, features)
     parsed_features['folder'] = tf.sparse_tensor_to_dense(parsed_features['folder'], b'')[0]
+    parsed_features['is_train'] = tf.cast(parsed_features['is_train'][0], tf.bool)
     parsed_features['files'] = tf.sparse_tensor_to_dense(parsed_features['files'], b'')
     parsed_features['instruments'] = tf.sparse_tensor_to_dense(parsed_features['instruments'], b'')
     parsed_features['types'] = tf.sparse_tensor_to_dense(parsed_features['types'], b'')
@@ -125,6 +127,14 @@ def prepare_examples(parsed_features, data_params):
     return example
 
 
+def select_train_examples(parsed_features):
+    return parsed_features['is_train']
+
+
+def select_val_examples(parsed_features):
+    return tf.logical_not(parsed_features['is_train'])
+
+
 def bach10_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
@@ -134,9 +144,13 @@ def bach10_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
-    return tfdataset
+
+    train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+
+    train_dataset = train_dataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
+    val_dataset = val_dataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
+    return train_dataset, val_dataset
 
 
 def medleydb_pipeline(data_params):
@@ -152,6 +166,10 @@ def medleydb_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
-    return tfdataset
+
+    train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+
+    train_dataset = train_dataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
+    val_dataset = val_dataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
+    return train_dataset, val_dataset
