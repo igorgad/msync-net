@@ -8,9 +8,9 @@ import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-logname = 'td_mwaynet_logmel_difftest_rangeacc'
+logname = 'tdmway_bach10'
 
-train_params = {'lr': 0.0001,
+train_params = {'lr': 0.001,
                 'weights_file': './saved_models/%s_dctw_weights.h5' % logname,
                 }
 
@@ -18,11 +18,13 @@ data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
                'audio_root': './data/BACH10/Audio',
                'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 16,
-               'sequential_batch_size': 8,
+               'random_batch_size': 16,  # For training
+               'sequential_batch_size': 8,  # For validation
                'shuffle_buffer': 32,
                'scale_value': 1.0,
-               'max_delay': 4 * 15360
+               'max_delay': 4 * 15360,
+               'instrument_1': 'electric bass',         # Only valid for MedleyDB dataset
+               'instrument_2': 'clean electric guitar'  # Only valid for MedleyDB dataset
                }
 
 # Get Model
@@ -30,7 +32,7 @@ msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data
 model = msync_model.build_model()
 
 # Get data pipelines
-train_data = dts.pipeline(data_params)
+train_data = dts.bach10_pipeline(data_params)
 
 # Classification Training
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)

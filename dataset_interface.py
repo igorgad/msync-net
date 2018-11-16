@@ -81,7 +81,7 @@ def prepare_examples(parsed_features, data_params):
     return example
 
 
-def pipeline(data_params):
+def bach10_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(parse_features_and_decode)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4).cache()

@@ -12,7 +12,7 @@ class MSYNCModel:
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')
         logmel = tf.keras.layers.TimeDistributed(LogMel())(input)
 
-        vggout = vggish(logmel, trainable=False, name=name)
+        vggout = vggish(logmel, trainable=True, name=name)
 
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization())(vggout)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128))(output)
@@ -21,8 +21,8 @@ class MSYNCModel:
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64))(output)
 
         model = tf.keras.Model(input, output, name=name)
-        model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
-        model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
+#         model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
+#         model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
         return model
 
     def build_model(self):
