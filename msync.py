@@ -10,7 +10,7 @@ from MSYNC.Model import MSYNCModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 logname = 'tdmway_bach10'
 
-train_params = {'lr': 0.001,
+train_params = {'lr': 0.0001,
                 'weights_file': './saved_models/%s_dctw_weights.h5' % logname,
                 }
 

@@ -1,21 +1,25 @@
 
 import tensorflow as tf
+import numpy as np
 import os
+
 
 features = {
         'folder': tf.VarLenFeature(tf.string),
         'files': tf.VarLenFeature(tf.string),
         'instruments': tf.VarLenFeature(tf.string),
-        'signals': tf.VarLenFeature(tf.string)
+        'types': tf.VarLenFeature(tf.string),
+        'activations': tf.VarLenFeature(tf.string)
 }
 
 
-def parse_features_and_decode(tf_example):
+def parse_features_and_decode(tf_example, features):
     parsed_features = tf.parse_single_example(tf_example, features)
     parsed_features['folder'] = tf.sparse_tensor_to_dense(parsed_features['folder'], b'')[0]
     parsed_features['files'] = tf.sparse_tensor_to_dense(parsed_features['files'], b'')
     parsed_features['instruments'] = tf.sparse_tensor_to_dense(parsed_features['instruments'], b'')
-    parsed_features['signals'] = tf.decode_raw(tf.sparse_tensor_to_dense(parsed_features['signals'], b''), tf.float32)
+    parsed_features['types'] = tf.sparse_tensor_to_dense(parsed_features['types'], b'')
+    parsed_features['activations'] = tf.decode_raw(tf.sparse_tensor_to_dense(parsed_features['activations'], b''), tf.float32)
     return parsed_features
 
 
@@ -29,9 +33,49 @@ def load_audio(parsed_features, data_params):
     return parsed_features
 
 
+def compute_activations(parsed_features, data_params):
+    def func(labmat):
+        dtime = np.diff(labmat[0])
+        lab = []
+        for b in range(1, labmat.shape[0]):
+            lab.append(np.hstack([np.ones(int(dtime[i] / (1 / data_params['sample_rate'])), np.float32) * labmat[b, i] for i in range(dtime.size)]))
+        return np.array(lab)
+
+    parsed_features['activations'] = tf.py_func(func, [parsed_features['activations']], [tf.float32])[0]
+    return parsed_features
+
+
+def mix_similar_instruments(parsed_features, data_params):
+    unique_instruments = tf.unique(parsed_features['instruments'])
+    mix_signal = lambda signal, i: tf.reduce_mean(tf.gather(signal, tf.where(tf.equal(unique_instruments.idx, i))[:, 0], axis=0), axis=0)
+    mix_types = lambda i: tf.gather(parsed_features['types'], tf.where(tf.equal(unique_instruments.idx, i))[:, 0], axis=0)[0]
+    parsed_features['signals'] = tf.map_fn(lambda i: mix_signal(parsed_features['signals'], i), tf.range(tf.shape(unique_instruments.y)[0]), dtype=tf.float32, infer_shape=False)
+    parsed_features['activations'] = tf.map_fn(lambda i: mix_signal(parsed_features['activations'], i), tf.range(tf.shape(unique_instruments.y)[0]), dtype=tf.float32, infer_shape=False)
+    parsed_features['types'] = tf.map_fn(mix_types, tf.range(tf.shape(unique_instruments.y)[0]), dtype=tf.string, infer_shape=False)
+    parsed_features['instruments'] = unique_instruments.y
+    return  parsed_features
+
+
+def filter_instruments(parsed_features, data_params):
+    return tf.logical_and(tf.reduce_any(tf.equal(parsed_features['instruments'], data_params['instrument_1'])), tf.reduce_any(tf.equal(parsed_features['instruments'], data_params['instrument_2'])))
+
+
+def select_instruments(parsed_features, data_params):
+    i1_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_1']))[0, 0]
+    i2_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_2']))[0, 0]
+    idx = tf.stack([i1_index, i2_index], axis=0)
+
+    parsed_features['signals'] = tf.map_fn(lambda i: tf.gather(parsed_features['signals'], i, axis=0), idx, dtype=tf.float32)
+    parsed_features['activations'] = tf.map_fn(lambda i: tf.gather(parsed_features['activations'], i, axis=0), idx, dtype=tf.float32)
+    parsed_features['instruments'] = tf.map_fn(lambda i: tf.gather(parsed_features['instruments'], i, axis=0), idx, dtype=tf.string)
+    parsed_features['types'] = tf.map_fn(lambda i: tf.gather(parsed_features['types'], i, axis=0), idx, dtype=tf.string)
+    return parsed_features
+
+
 def copy_v0_to_vall(parsed_features):
     num_signals = tf.shape(parsed_features['signals'])[0]
     parsed_features['signals'] = tf.map_fn(lambda sig: parsed_features['signals'][0], tf.range(num_signals), dtype=tf.float32, infer_shape=False)
+    parsed_features['instruments'] = tf.map_fn(lambda sig: parsed_features['instruments'][0], tf.range(num_signals), dtype=tf.string, infer_shape=False)
     return parsed_features
 
 
@@ -83,13 +127,30 @@ def prepare_examples(parsed_features, data_params):
 
 def bach10_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
-    tfdataset = tfdataset.map(parse_features_and_decode)
+    tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4).cache()
-#     tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
+    # tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
+    return tfdataset
 
+
+def medleydb_pipeline(data_params):
+    tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
+    tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
+    tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4).cache()
+    # tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
+    tfdataset = tfdataset.map(lambda feat: compute_activations(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: mix_similar_instruments(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.filter(lambda feat: filter_instruments(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: select_instruments(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size'])
