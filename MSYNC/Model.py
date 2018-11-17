@@ -10,15 +10,15 @@ class MSYNCModel:
 
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')
-        logmel = tf.keras.layers.TimeDistributed(LogMel())(input)
+        logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
         vggout = vggish(logmel, trainable=True, name=name)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization())(vggout)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128))(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization())(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.LeakyReLU(alpha=0.3))(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64))(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name+'bn1')(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name+'fc1')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name+'bn2')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.LeakyReLU(alpha=0.3), name=name+'leakyRelu')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name+'fc2')(output)
 
         model = tf.keras.Model(input, output, name=name)
 #         model.load_weights('./saved_models/v1VGGish.h5', by_name=True)

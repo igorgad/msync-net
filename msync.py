@@ -14,7 +14,7 @@ train_params = {'lr': 0.0001,
                 'drop_epoch': 5
                 }
 
-dataset = 'bach10'
+dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
@@ -25,8 +25,8 @@ data_params = {'sample_rate': 16000,
                'shuffle_buffer': 32,
                'scale_value': 1.0,
                'max_delay': 4 * 15360,
-               'instrument_1': 'electric bass',         # Only valid for MedleyDB dataset
-               'instrument_2': 'clean electric guitar'  # Only valid for MedleyDB dataset
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'drum set',         # Only valid for MedleyDB dataset
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'electric bass'  # Only valid for MedleyDB dataset
                }
 
 logname = 'tfmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()]) + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
