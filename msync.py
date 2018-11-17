@@ -29,7 +29,7 @@ data_params = {'sample_rate': 16000,
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'electric bass'  # Only valid for MedleyDB dataset
                }
 
-logname = 'tfmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()]) + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
+logname = 'tdmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()]) + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 
 # Get Model
 msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
