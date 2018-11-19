@@ -11,7 +11,7 @@ def vggish(input, trainable=False, name=''):
     x = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'), trainable=trainable, name=name+'pool1')(x)
 
     # Block 2
-    x = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same', trainable=trainable), name=name+'conv2')(x)
+    x = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(128, (3, 3), strides=(1, 1), activation='relu', padding='same'), trainable=trainable, name=name+'conv2')(x)
     x = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'), trainable=trainable, name=name+'pool2')(x)
 
     # Block 3
