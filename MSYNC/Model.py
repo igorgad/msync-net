@@ -4,25 +4,27 @@ from MSYNC.vggish import vggish
 
 
 class MSYNCModel:
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, use_pretrain=False):
         self.input_shape = input_shape
+        self.use_pretrain = use_pretrain
         self.model = None
 
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(self.input_shape, name=name+'input')
         logmel = LogMel()(input)
         
-        vggout = vggish(logmel, trainable=True, name=name)
+        vggout = vggish(logmel, trainable=~self.use_pretrain, name=name)
         
-        output = tf.keras.layers.BatchNormalization()(vggout)
-        output = tf.keras.layers.Dense(128)(output)
-        output = tf.keras.layers.BatchNormalization()(output)
-        output = tf.keras.layers.LeakyReLU(alpha=0.3)(output)
-        output = tf.keras.layers.Dense(64)(output)
+        output = tf.keras.layers.BatchNormalization(name=name+'bn1')(vggout)
+        output = tf.keras.layers.Dense(128, name=name+'fc1')(output)
+        output = tf.keras.layers.BatchNormalization(name=name+'bn2')(output)
+        output = tf.keras.layers.LeakyReLU(alpha=0.3, name=name+'leakyRelu')(output)
+        output = tf.keras.layers.Dense(64, name=name+'fc2')(output)
 
         model = tf.keras.Model(input, output, name=name)
-        model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
-        model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
+        if self.use_pretrain:
+            model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
+            model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
         return model
 
     def build_model(self):
