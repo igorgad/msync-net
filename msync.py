@@ -12,7 +12,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 train_params = {'lr': 0.0001,
                 'drop_lr': 0.1,
                 'drop_epoch': 5,
-                'pretrain': False
+                'pretrain': True
                 }
 
 dataset = 'medleydb'
@@ -23,7 +23,7 @@ data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
                'random_batch_size': 128,  # For training
                'sequential_batch_size': 8,  # For validation
-               'max_delay': 4 * 15360,
+               'max_delay': 2,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',         # Only valid for MedleyDB dataset
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',  # Only valid for MedleyDB dataset
                'debug_auto': True

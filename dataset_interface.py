@@ -145,6 +145,7 @@ def random_batch(parsed_features, data_params):
     widx_max = tf.reduce_min(tf.map_fn(lambda sig: tf.shape(sig)[0], parsed_features['signals'], dtype=tf.int32, infer_shape=False))
     widx = tf.random_uniform([1], 0, widx_max, dtype=tf.int32)[0]
     parsed_features['signals'] = tf.map_fn(lambda sig: tf.gather(sig, widx, axis=0), parsed_features['signals'], dtype=tf.float32, infer_shape=False)
+    parsed_features['signals'].set_shape([2, data_params['example_length']])
     return parsed_features
 
 
@@ -160,6 +161,7 @@ def sequential_batch(parsed_features, data_params):
                                         tf.range(num_sig), dtype=tf.float32)
 
     parsed_features['apply_delay'] = tf.one_hot([widx_mid[0] - widx[0]], data_params['sequential_batch_size'], on_value=False, off_value=True, dtype=tf.bool)[0]
+    parsed_features['signals'].set_shape([2, data_params['sequential_batch_size'], data_params['example_length']])
     return parsed_features
 
 
