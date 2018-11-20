@@ -33,49 +33,62 @@ tfdataset = tfdataset.filter(lambda feat: dts.filter_instruments(feat, data_para
 tfdataset = tfdataset.map(lambda feat: dts.select_instruments(feat, data_params), num_parallel_calls=4)
 tfdataset = tfdataset.map(lambda feat: dts.load_audio(feat, data_params), num_parallel_calls=4)
 tfdataset = tfdataset.map(lambda feat: dts.compute_activations(feat, data_params), num_parallel_calls=4)
-tfdataset = tfdataset.map(lambda feat: dts.copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
 tfdataset = tfdataset.map(lambda feat: dts.mix_similar_instruments(feat, data_params), num_parallel_calls=4)
+# tfdataset = tfdataset.map(lambda feat: dts.copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
 tfdataset = tfdataset.map(lambda feat: dts.scale_signals(feat, data_params), num_parallel_calls=4).cache()
 tfdataset = tfdataset.map(lambda feat: dts.add_random_delay(feat, data_params), num_parallel_calls=4)
 tfdataset = tfdataset.map(lambda feat: dts.frame_signals(feat, data_params), num_parallel_calls=4)
 tfdataset = tfdataset.map(lambda feat: dts.remove_non_active_frames(feat, data_params), num_parallel_calls=4)
 tfdataset = tfdataset.filter(lambda feat: dts.filter_nwin_less_sequential_bach(feat, data_params))
 tfdataset = tfdataset.map(lambda feat: dts.sequential_batch(feat, data_params), num_parallel_calls=4)
-tfdataset = tfdataset.map(lambda feat: dts.resample_train_test(feat, 0.8), num_parallel_calls=4)
+tfdataset = tfdataset.map(lambda feat: dts.compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
+# tfdataset = tfdataset.map(lambda feat: dts.prepare_examples(feat, data_params), num_parallel_calls=4)
 
-train_dataset = tfdataset.filter(dts.select_train_examples).map(lambda feat: dts.prepare_examples(feat, data_params), num_parallel_calls=4)
-val_dataset = tfdataset.filter(dts.select_val_examples).map(lambda feat: dts.prepare_examples(feat, data_params), num_parallel_calls=4)
+parsed_features = tfdataset.make_one_shot_iterator().get_next()
+r = sess.run(parsed_features)
 
+dl = []
 try:
-    num_ex_train = 0
-    ex = train_dataset.make_one_shot_iterator().get_next()
     while True:
-        r = sess.run(ex)
-        plt.clf()
-        plt.plot(r[0]['v1input'].reshape(-1))
-        plt.plot(r[0]['v2input'].reshape(-1))
-        plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'])
-        plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'] + data_params['example_length'])
-        num_ex_train += 1
+       r = sess.run(parsed_features)
+       dl.append(np.nonzero(r['one_hot_delay']))
 except Exception as e:
-    print (str(e))
-    pass
+    print (e)
 
-try:
-    num_ex_val = 0
-    ex = val_dataset.make_one_shot_iterator().get_next()
-    while True:
-        r = sess.run(ex)
-        plt.clf()
-        plt.plot(r[0]['v1input'].reshape(-1))
-        plt.plot(r[0]['v2input'].reshape(-1))
-        plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'])
-        plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'] + data_params['example_length'])
-        plt.pause(0.1)
-        num_ex_val += 1
-except Exception as e:
-    print(str(e))
-    pass
 
-t = num_ex_val + num_ex_train
-print (str(t) + ', ' + str(num_ex_train / t) + ' | ' + str(num_ex_val / t))
+# train_dataset = tfdataset.filter(dts.select_train_examples).map(lambda feat: dts.prepare_examples(feat, data_params), num_parallel_calls=4)
+# val_dataset = tfdataset.filter(dts.select_val_examples).map(lambda feat: dts.prepare_examples(feat, data_params), num_parallel_calls=4)
+#
+# try:
+#     num_ex_train = 0
+#     ex = train_dataset.make_one_shot_iterator().get_next()
+#     while True:
+#         r = sess.run(ex)
+#         plt.clf()
+#         plt.plot(r[0]['v1input'].reshape(-1))
+#         plt.plot(r[0]['v2input'].reshape(-1))
+#         plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'])
+#         plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'] + data_params['example_length'])
+#         num_ex_train += 1
+# except Exception as e:
+#     print (str(e))
+#     pass
+#
+# try:
+#     num_ex_val = 0
+#     ex = val_dataset.make_one_shot_iterator().get_next()
+#     while True:
+#         r = sess.run(ex)
+#         plt.clf()
+#         plt.plot(r[0]['v1input'].reshape(-1))
+#         plt.plot(r[0]['v2input'].reshape(-1))
+#         plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'])
+#         plt.axvline(np.nonzero(r[1])[0][0] * data_params['example_length'] + data_params['example_length'])
+#         plt.pause(0.1)
+#         num_ex_val += 1
+# except Exception as e:
+#     print(str(e))
+#     pass
+#
+# t = num_ex_val + num_ex_train
+# print (str(t) + ', ' + str(num_ex_train / t) + ' | ' + str(num_ex_val / t))

@@ -34,18 +34,18 @@ def filter_instruments(parsed_features, data_params):
 
 
 def select_instruments(parsed_features, data_params):
-    i1_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_1']))[0, 0]
-    i2_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_2']))[0, 0]
-    idx = tf.stack([i1_index, i2_index], axis=0)
+    i1_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_1']))[:, 0]
+    i2_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_2']))[:, 0]
+    idx = tf.concat([i1_index, i2_index], axis=0)
 
     parsed_features['files'] = tf.map_fn(lambda i: tf.gather(parsed_features['files'], i, axis=0), idx, dtype=tf.string)
     parsed_features['instruments'] = tf.map_fn(lambda i: tf.gather(parsed_features['instruments'], i, axis=0), idx, dtype=tf.string)
 
     is_bach10 = is_empty(parsed_features['types'])
     parsed_features['types'] = tf.cond(is_bach10, lambda: parsed_features['types'],
-                                                  lambda: tf.map_fn(lambda i: tf.gather(parsed_features['types'], i, axis=0), idx, dtype=tf.string))
+                                       lambda: tf.map_fn(lambda i: tf.gather(parsed_features['types'], i, axis=0), idx, dtype=tf.string))
     parsed_features['activations'] = tf.cond(is_bach10, lambda: parsed_features['activations'],
-                                                        lambda: tf.map_fn(lambda i: tf.gather(parsed_features['activations'], i, axis=0), tf.stack([0, i1_index+1, i2_index+1], axis=0), dtype=tf.float32))
+                                             lambda: tf.map_fn(lambda i: tf.gather(parsed_features['activations'], i, axis=0), tf.concat([[0], i1_index + 1, i2_index + 1], axis=0), dtype=tf.float32))
     return parsed_features
 
 
@@ -157,10 +157,15 @@ def sequential_batch(parsed_features, data_params):
     return parsed_features
 
 
+def compute_one_hot_delay(parsed_features, data_params):
+    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params['example_length']), tf.int32)
+    parsed_features['one_hot_delay'] = tf.one_hot(data_params['sequential_batch_size'] // 2 + int_delay, data_params['sequential_batch_size'])
+    return parsed_features
+
+
 def prepare_examples(parsed_features, data_params):
     data = {'v1input': parsed_features['signals'][0], 'v2input': parsed_features['signals'][1]}
-    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params['example_length']), tf.int32)
-    labels = tf.one_hot(data_params['sequential_batch_size']//2 + int_delay, data_params['sequential_batch_size'])
+    labels = parsed_features['one_hot_delay']
     example = data, labels
     return example
 
@@ -184,11 +189,13 @@ def bach10_pipeline(data_params):
     tfdataset = tfdataset.filter(lambda feat: filter_instruments(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: select_instruments(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4)
-    # tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
+    if data_params['debug_auto']:
+        tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4).cache()
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
 
     train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
     val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
@@ -205,14 +212,16 @@ def medleydb_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: select_instruments(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: compute_activations(feat, data_params), num_parallel_calls=4)
-    # tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: mix_similar_instruments(feat, data_params), num_parallel_calls=4)
+    if data_params['debug_auto']:
+        tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4).cache()
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
 
     train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
     val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)

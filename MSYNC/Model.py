@@ -4,15 +4,16 @@ from MSYNC.vggish import vggish
 
 
 class MSYNCModel:
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, use_pretrain=False):
         self.input_shape = input_shape
+        self.use_pretrain = use_pretrain
         self.model = None
 
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
-        vggout = vggish(logmel, trainable=True, name=name)
+        vggout = vggish(logmel, trainable=~self.use_pretrain, name=name)
 
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name+'bn1')(vggout)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name+'fc1')(output)
@@ -21,8 +22,9 @@ class MSYNCModel:
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name+'fc2')(output)
 
         model = tf.keras.Model(input, output, name=name)
-#         model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
-#         model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
+        if self.use_pretrain:
+            model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
+            model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
         return model
 
     def build_model(self):
