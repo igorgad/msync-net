@@ -138,7 +138,7 @@ def sequential_batch(parsed_features, data_params):
     widx = tf.range(widx_beg, widx_beg + data_params['sequential_batch_size'])
     parsed_features['signals'] = tf.map_fn(lambda sigid: tf.gather(parsed_features['signals'][sigid], widx, axis=0), tf.range(num_sig), dtype=tf.float32)
     parsed_features['activations'] = tf.map_fn(lambda sigid: tf.gather(parsed_features['activations'][sigid], widx, axis=0), tf.range(num_sig), dtype=tf.float32)
-
+    parsed_features['signals'].set_shape([2, data_params['sequential_batch_size'], data_params['example_length']])
     return parsed_features
 
 

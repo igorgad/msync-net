@@ -15,7 +15,7 @@ train_params = {'lr': 0.0001,
                 'pretrain': False
                 }
 
-dataset = 'medleydb'
+dataset = 'bach10'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
