@@ -41,7 +41,7 @@ data_params['scale_value'] = 1.0
 data_params['shuffle_buffer'] = 32
 data_params['dataset_file'] = dataset_file
 data_params['audio_root'] = dataset_audio_root
-train_data, validation_data = dts.bach10_pipeline(data_params) if dataset == 'bach10' else dts.medleydb_pipeline(data_params)
+train_data, validation_data = dts.pipeline(data_params)
 
 # Classification Training
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)

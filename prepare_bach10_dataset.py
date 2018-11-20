@@ -10,6 +10,11 @@ audio_dir = data_root + '/Audio/'
 tfrecordfile = data_root + 'MSYNC-bach10.tfrecord'
 train_test_ratio = 0.8
 
+strings = [b'violin']
+brass = [b'saxphone']
+woods = [b'bassoon', b'clarinet']
+tps = {'strings': strings, 'brass': brass, 'woods': woods}
+
 
 def int64_feature(value):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
@@ -39,10 +44,13 @@ for folder in os.listdir(fs_audio_dir):
         instruments.append(file.split(b'.wav')[0].split(b'-')[-1])
         signals.append(np.float32(wave.read(fs_audio_dir + folder + b'/' + file)[1]).tostring())
 
+    types = [os.fsencode(list(tps.keys())[np.nonzero([s.count(inst) for s in tps.values()])[0][0]]) for inst in instruments]
+
     tf_example = tf.train.Example(features=tf.train.Features(feature={'folder': bytes_feature([folder]),
                                                                       'is_train': int64_feature(np.int64(is_train)),
                                                                       'files': bytes_feature(files),
                                                                       'instruments': bytes_feature(instruments),
+                                                                      'types': bytes_feature(types),
                                                                       'signals': bytes_feature(signals)
                                                                       }))
 
