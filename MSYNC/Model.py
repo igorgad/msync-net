@@ -1,6 +1,7 @@
 
 import tensorflow as tf
 from MSYNC.vggish import vggish
+from MSYNC.GFNN import GFNNLayer
 
 
 class MSYNCModel:
@@ -11,7 +12,9 @@ class MSYNCModel:
 
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')
-        logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
+        # logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
+        logmel = tf.keras.layers.TimeDistributed(GFNNLayer(64, 1/16000), name=name+'gfnn')(input)
+        logmel = tf.keras.layers.TimeDistributed(tf.keras.layers.AveragePooling2D((100,1)))(logmel)
 
         vggout = vggish(logmel, trainable=~self.use_pretrain, name=name)
 

@@ -16,12 +16,10 @@ data_params = {'sample_rate': 16000,
                'random_batch_size': 16,  # For training
                'sequential_batch_size': 8,  # For validation
                'max_delay': 4 * 15360,
-               'instrument_1': 'bassoon' if dataset == 'bach10' else 'clean electric guitar',         # Only valid for MedleyDB dataset
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'acoustic guitar',  #'piano',  # Only valid for MedleyDB dataset
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'drum set',         # Only valid for MedleyDB dataset
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',  #'piano',  # Only valid for MedleyDB dataset
                'debug_auto': False
                }
-
-
 
 data_params['scale_value'] = 1.0
 data_params['shuffle_buffer'] = 32

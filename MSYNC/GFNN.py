@@ -15,8 +15,8 @@ class GFNN:
         if osc_params is not None:
             self._osc_params = osc_params
         else:
-            self._osc_params = {'f_min': 200.0,
-                                'f_max': 5000.0,
+            self._osc_params = {'f_min': 125.0,
+                                'f_max': 7500.0,
                                 'alpha': -1.0,
                                 'beta1': -10.0,
                                 'beta2': 0.0,
@@ -140,12 +140,13 @@ class GFNNLayer(tf.keras.layers.Layer):
             inputs = tf.complex(inputs, 0.0)
 
         z_state = tf.abs(self.gfnn.run(inputs)[0])
+        z_state = tf.expand_dims(z_state, axis=-1)
 
-        tf.summary.image('z_state', tf.expand_dims(z_state, axis=-1))
+        # tf.summary.image('z_state', z_state)
         return z_state
 
     def build(self, input_shape):
         super(GFNNLayer, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return input_shape[0],  input_shape[-1], self.gfnn._num_osc
+        return tf.TensorShape((input_shape[0],  input_shape[-1], self.gfnn._num_osc, 1))
