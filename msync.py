@@ -23,7 +23,7 @@ data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
                'random_batch_size': 16,  # For training
                'sequential_batch_size': 8,  # For validation
-               'max_delay': 4 * 15360,
+               'max_delay': 2,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',         # Only valid for MedleyDB dataset
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',  # Only valid for MedleyDB dataset
                'debug_auto': False
@@ -41,14 +41,14 @@ data_params['scale_value'] = 1.0
 data_params['shuffle_buffer'] = 32
 data_params['dataset_file'] = dataset_file
 data_params['audio_root'] = dataset_audio_root
-train_data, validation_data = dts.bach10_pipeline(data_params) if dataset == 'bach10' else dts.medleydb_pipeline(data_params)
+train_data, validation_data = dts.pipeline(data_params)
 
 # Classification Training
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
-early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=4, verbose=1, mode='auto')
+early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=4, batch_size=data_params['random_batch_size'], write_images=True)
 lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(train_params['drop_lr'], np.floor((1 + epoch) / train_params['drop_epoch'])))
-callbacks = [checkpoint, tensorboard, lr_scheduler]
+callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
 
 model.summary()
 model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
