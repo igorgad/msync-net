@@ -38,7 +38,7 @@ def bytes_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
 
 
-np.random.seed(0)
+np.random.seed(2)
 # options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.GZIP)
 writer = tf.python_io.TFRecordWriter(tfrecordfile)
 
