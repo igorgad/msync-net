@@ -4,7 +4,6 @@ import numpy as np
 
 
 class GFNN:
-    
     def __init__(self, num_osc, dt, osc_params=None, use_hebbian_learning=False, heb_params=None):
         self._num_osc = num_osc
         self._dt = dt
@@ -15,10 +14,10 @@ class GFNN:
         if osc_params is not None:
             self._osc_params = osc_params
         else:
-            self._osc_params = {'f_min': 125.0,
-                                'f_max': 4000.0,
-                                'alpha': -2.0,
-                                'beta1': -100.0,
+            self._osc_params = {'f_min': 0.125,
+                                'f_max': 8.0,
+                                'alpha': -1.0,
+                                'beta1': -10.0,
                                 'beta2': 0.0,
                                 'delta1': 0.0,
                                 'delta2': 0.0,
@@ -150,3 +149,69 @@ class GFNNLayer(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape((input_shape[0],  input_shape[-1], self.gfnn._num_osc, 1))
+
+
+class HebCon:
+    def __init__(self, dt, heb_params=None):
+        self._dt = dt
+        self._c_state = []
+        self.num_osc1 = None
+        self.num_osc2 = None
+
+        if heb_params is not None:
+            self._heb_params = heb_params
+        else:
+            self._heb_params = {'lamb': 0.0,
+                                'mu1': -10.0,
+                                'mu2': -10.0,
+                                'eps': 4.0,
+                                'k': 1.0}
+
+        self._lamb = np.complex64(self._heb_params['lamb'])
+        self._mu1 = np.complex64(self._heb_params['mu1'])
+        self._mu2 = np.complex64(self._heb_params['mu2'])
+        self._ec = np.complex64(self._heb_params['eps'])
+        self._sqec = np.sqrt(self._ec)
+        self._kc = np.complex64(self._heb_params['k'] + 1j * self._heb_params['k'])
+        self._c_limit = np.abs(1 / self._sqec)
+
+    def _initialize_states_with_zeros(self, batch_size):
+        self._c_state = tf.zeros([batch_size, self.num_osc1, self.num_osc2], dtype=tf.complex64)
+
+    def _cdot(self, internal_stimulus, state, ti):
+        z1, z2 = tf.unstack(tf.gather(internal_stimulus, ti, axis=1), axis=-1)
+        c = state
+
+        c2 = tf.complex(tf.pow(tf.abs(c), 2), 0.0)
+        c4 = tf.complex(tf.pow(tf.abs(c), 4), 0.0)
+
+        def zmul(zi, zj):
+            return tf.divide(zi, 1 - self._sqec * zi) * tf.divide(zj, 1 - self._sqec * tf.conj(zj)) * tf.reciprocal(
+                1 - self._sqec * zj)
+
+        fz = tf.transpose(tf.map_fn(lambda i: zmul(tf.expand_dims(z1[:, i], axis=-1), z2), tf.range(self.num_osc1),
+                                    dtype=tf.complex64, parallel_iterations=128), [1, 0, 2])
+        dcdt = c * (self._lamb + self._mu1 * c2 + self._ec * self._mu2 * c4 / (1 - self._ec * c2)) + self._kc * fz
+
+        # dcdt = tf.where(tf.greater(tf.real(dcdt), np.real(self._c_limit)), self._c_limit * tf.ones_like(dcdt), dcdt)
+        # dcdt = tf.where(tf.is_nan(tf.real(dcdt)), self._c_limit * tf.ones_like(dcdt), dcdt)
+
+        return dcdt
+
+    def run(self, input1, input2):
+        batch_size = tf.shape(input1)[0]
+        input_size1 = tf.shape(input1)[1]
+        input_size2 = tf.shape(input2)[1]
+        self.num_osc1 = tf.shape(input1)[2]
+        self.num_osc2 = tf.shape(input2)[2]
+
+        self._initialize_states_with_zeros(batch_size)
+
+        dt = tf.convert_to_tensor(self._dt)
+        t = tf.range(0, tf.cast(tf.minimum(input_size1, input_size2), tf.float32) * dt, self._dt)
+
+        input_state = tf.concat([tf.expand_dims(input1, axis=-1), tf.expand_dims(input2, axis=-1)], axis=-1)
+
+        c_state = tf.contrib.integrate.odeint_fixed(lambda s, t: self._cdot(input_state, s, tf.cast(t // dt, tf.int32)), self._c_state, t, dt, method='rk4')
+        c_state = tf.transpose(c_state, [1, 2, 3, 0])
+        return c_state
