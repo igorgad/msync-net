@@ -29,7 +29,7 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False
                }
 
-logname = 'tdmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'master-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 
 # Get Model
