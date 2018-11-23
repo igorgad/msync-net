@@ -16,7 +16,7 @@ class GFNN:
         else:
             self._osc_params = {'f_min': 0.125,
                                 'f_max': 8.0,
-                                'alpha': -1.0,
+                                'alpha': 0.0,
                                 'beta1': -10.0,
                                 'beta2': 0.0,
                                 'delta1': 0.0,

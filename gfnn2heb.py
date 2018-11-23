@@ -52,4 +52,4 @@ sess.run(tf.global_variables_initializer())
 
 ex, r1, r2, rh = sess.run([ex, rg1, rg2, rheb])
 
-plt.imshow(np.abs(rh[0,:,:,-1]))
+plt.imshow(np.real(rh[0,:,:,-1]))
