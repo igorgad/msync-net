@@ -15,7 +15,7 @@ train_params = {'lr': 0.0001,
                 'pretrain': False
                 }
 
-dataset = 'medleydb'
+dataset = 'bach10'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
@@ -29,7 +29,7 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False
                }
 
-logname = 'tdmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'tdmway-rkhs-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
