@@ -90,6 +90,7 @@ def copy_v0_to_vall(parsed_features):
 def scale_signals(parsed_features, data_params):
     def scale_signal(signal):
         sig = 2 * data_params['scale_value'] * (signal - tf.reduce_min(signal)) / (tf.reduce_max(signal) - tf.reduce_min(signal)) - data_params['scale_value']
+        sig = sig - tf.reduce_mean(sig)
         return sig
 
     parsed_features['signals'] = tf.map_fn(scale_signal, parsed_features['signals'], dtype=tf.float32, infer_shape=False)
