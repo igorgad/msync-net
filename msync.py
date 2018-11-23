@@ -29,8 +29,9 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False
                }
 
-logname = 'td-mway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'tdmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
+print (logname)
 
 # Get Model
 msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), use_pretrain=train_params['pretrain'])
