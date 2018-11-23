@@ -21,7 +21,7 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 16,  # For training
+               'random_batch_size': 4,  # For training
                'sequential_batch_size': 8,  # For validation
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',         # Only valid for MedleyDB dataset
@@ -37,7 +37,7 @@ msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data
 model = msync_model.build_model()
 
 # Get data pipelines
-data_params['scale_value'] = 1.0
+data_params['scale_value'] = 0.2
 data_params['shuffle_buffer'] = 32
 data_params['dataset_file'] = dataset_file
 data_params['audio_root'] = dataset_audio_root
