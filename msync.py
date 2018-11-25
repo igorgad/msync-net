@@ -9,9 +9,9 @@ from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-train_params = {'lr': 0.0001,
-                'drop_lr': 0.1,
-                'drop_epoch': 5,
+train_params = {'lr': 0.00066,
+                'drop_lr': 0.00001,
+                'drop_epoch': 3,
                 'pretrain': False
                 }
 
@@ -29,7 +29,7 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False
                }
 
-logname = 'tdmway-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'lr_finder-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
@@ -54,3 +54,4 @@ callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
 model.summary()
 model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
 model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
+print (logname)
