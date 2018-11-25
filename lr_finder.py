@@ -25,36 +25,36 @@ data_params = {'sample_rate': 16000,
                'audio_root': dataset_audio_root
                }
 
-f = open('./logs/min_loss_lr.txt', 'w+')
-# lrs = np.random.uniform(1e-6, 1e-4, 100)
-# loss = []
+f = open('./logs/min_loss_lr.txt', 'w')
+lrs = np.random.uniform(1e-6, 1e-4, 100)
+loss = []
 
-# for lr in lrs:
-#     train_data, _ = dts.pipeline(data_params)
-#     msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), use_pretrain=False)
-#     model = msync_model.build_model()
-#     model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=lr))
-#     hist = model.fit(train_data, epochs=4, steps_per_epoch=25)
-#     loss.append(np.min(hist.history['loss']))
+for lr in lrs:
+    train_data, _ = dts.pipeline(data_params)
+    msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), use_pretrain=False)
+    model = msync_model.build_model()
+    model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=lr))
+    hist = model.fit(train_data, epochs=4, steps_per_epoch=25)
+    loss.append(np.min(hist.history['loss']))
 
-#     print('**********************************************')
-#     print (str(len(loss)) + ' - lr: ' + str(lr) + ', loss: ' + str(np.min(hist.history['loss'])) + '. min_loss: ' + str(np.min(np.array(loss))))
-#     print('**********************************************')
+    print('**********************************************')
+    print (str(len(loss)) + ' - lr: ' + str(lr) + ', loss: ' + str(np.min(hist.history['loss'])) + '. min_loss: ' + str(np.min(np.array(loss))))
+    print('**********************************************')
 
-#     tf.keras.backend.clear_session()
+    tf.keras.backend.clear_session()
 
-# # Get minimum loss and better lr
-# loss = np.array(loss)
-# min_loss = np.min(loss)
-# lr_min_loss = lrs[np.argmin(loss)]
+# Get minimum loss and better lr
+loss = np.array(loss)
+min_loss = np.min(loss)
+lr_min_loss = lrs[np.argmin(loss)]
 
-# print('**********************************************')
-# print('**********************************************')
-# print ('UNIFORM min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss))
-# print('**********************************************')
+print('**********************************************')
+print('**********************************************')
+print ('UNIFORM min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss))
+print('**********************************************')
 
-# f.write('UNIFORM min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss) + '\n')
-lrs = np.random.normal(6.07511e-5, 1e-6, 100)
+f.write('UNIFORM min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss) + '\n')
+lrs = np.random.normal(lr_min_loss, 1e-6, 100)
 loss = []
 
 for lr in lrs:
