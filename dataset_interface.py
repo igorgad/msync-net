@@ -99,16 +99,17 @@ def scale_signals(parsed_features, data_params):
 
 def add_random_delay(parsed_features, data_params):
     num_signals = tf.shape(parsed_features['signals'])[0]
-    delay = tf.random_uniform([num_signals], 1, data_params['max_delay'], dtype=tf.int32)
+    delay = tf.stack([1, (data_params['max_delay'] - tf.random_uniform([1], 1, 2 * data_params['max_delay'], dtype=tf.int32)[0])])
 
-    def add_delay(signal_index):
-        return tf.concat([tf.zeros(delay[signal_index], dtype=tf.float32), parsed_features['signals'][signal_index, 0:-delay[signal_index]]], axis=0)
-    def add_delay_activations(signal_index):
-        return tf.concat([tf.zeros(delay[signal_index], dtype=tf.float32), parsed_features['activations'][signal_index, 0:-delay[signal_index]]], axis=0)
+    def add_delay(signals, signal_index):
+        pos_delay_func = lambda: tf.concat([tf.zeros(delay[signal_index], dtype=tf.float32), signals[signal_index, 0:-delay[signal_index]]], axis=0)
+        neg_delay_func = lambda: tf.concat([signals[signal_index, tf.abs(delay[signal_index]):-1], tf.zeros(tf.abs(delay[signal_index]) + 1, dtype=tf.float32)], axis=0)
+
+        return tf.cond(delay[signal_index] < 0, neg_delay_func, pos_delay_func)
 
     parsed_features['delay'] = delay
-    parsed_features['signals'] = tf.map_fn(add_delay, tf.range(num_signals), dtype=tf.float32, infer_shape=False, parallel_iterations=2)
-    parsed_features['activations'] = tf.map_fn(add_delay_activations, tf.range(num_signals), dtype=tf.float32, infer_shape=False, parallel_iterations=2)
+    parsed_features['signals'] = tf.map_fn(lambda sig: add_delay(parsed_features['signals'], sig), tf.range(num_signals), dtype=tf.float32, infer_shape=False, parallel_iterations=2)
+    parsed_features['activations'] = tf.map_fn(lambda sig: add_delay(parsed_features['activations'], sig), tf.range(num_signals), dtype=tf.float32, infer_shape=False, parallel_iterations=2)
     return parsed_features
 
 
@@ -140,8 +141,8 @@ def sequential_batch(parsed_features, data_params):
 
 
 def compute_one_hot_delay(parsed_features, data_params):
-    int_delay = tf.cast((parsed_features['delay'][1] - parsed_features['delay'][0]) // data_params['example_length'], tf.int32)
-    parsed_features['one_hot_delay'] = tf.one_hot(data_params['sequential_batch_size'] // 2 + int_delay, data_params['sequential_batch_size'])
+    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params['example_length']), tf.int32)
+    parsed_features['one_hot_delay'] = tf.one_hot(data_params['sequential_batch_size'] // 2 + int_delay, data_params['sequential_batch_size'] + 1)
     return parsed_features
 
 

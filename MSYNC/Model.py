@@ -111,13 +111,13 @@ class DiagMean(tf.keras.layers.Layer):
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]
-        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps//2, num_time_steps//2), dtype=tf.float32)
+        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps//2, 1 + num_time_steps//2), dtype=tf.float32)
         mean = tf.transpose(mean)
-        mean.set_shape([inputs.shape[0], inputs.shape[1]//2 + inputs.shape[2]//2])
+        mean.set_shape([inputs.shape[0], inputs.shape[1]//2 + inputs.shape[2]//2 + 1])
         return mean
 
     def build(self, input_shape):
         super(DiagMean, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1]//2 + input_shape[2]//2 - 1))
+        return tf.TensorShape((input_shape[0], input_shape[1]//2 + input_shape[2]//2 + 1))
