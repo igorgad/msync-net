@@ -24,5 +24,5 @@ def vggish(input, trainable=False, name=''):
     x = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(512, (3, 3), strides=(1, 1), activation='relu', padding='same'), trainable=trainable, name=name+'conv4/conv4_2')(x)
     x = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'), trainable=trainable, name=name+'pool4')(x)
 
-    x = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), trainable=trainable)(x)
+    x = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), trainable=trainable, name=name+'GAverage')(x)
     return x
