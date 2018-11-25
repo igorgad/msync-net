@@ -9,7 +9,7 @@ from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-train_params = {'lr': 0.0001,
+train_params = {'lr': 1e-4,
                 'drop_lr': 0.1,
                 'drop_epoch': 5,
                 'pretrain': False
