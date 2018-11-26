@@ -9,7 +9,7 @@ from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-train_params = {'lr': 6.4305e-5,
+train_params = {'lr': 6.2849e-5,
                 'drop_lr': 1e-5,
                 'drop_epoch': 3,
                 'pretrain': False
@@ -29,7 +29,7 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False
                }
 
-logname = 'lr_finder-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'lr_finder-s-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
@@ -49,7 +49,7 @@ checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=4, batch_size=data_params['random_batch_size'], write_images=True)
 lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(train_params['drop_lr'], np.floor((1 + epoch) / train_params['drop_epoch'])))
-callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
+callbacks = [checkpoint, tensorboard]
 
 model.summary()
 model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])

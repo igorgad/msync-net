@@ -25,7 +25,7 @@ data_params = {'sample_rate': 16000,
                'audio_root': dataset_audio_root
                }
 
-f = open('./logs/min_loss_lr.txt', 'w')
+f = open('./logs/min_loss_lr_newdtsi.txt', 'w')
 lrs = np.random.uniform(1e-6, 1e-4, 100)
 loss = []
 
@@ -50,11 +50,11 @@ lr_min_loss = lrs[np.argmin(loss)]
 
 print('**********************************************')
 print('**********************************************')
-print ('UNIFORM min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss))
+print ('COARSE min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss))
 print('**********************************************')
 
-f.write('UNIFORM min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss) + '\n')
-lrs = np.random.normal(lr_min_loss, 1e-6, 100)
+f.write('COARSE min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss) + '\n')
+lrs = np.random.uniform(lr_min_loss - 1e-5, lr_min_loss + 1e-5, 100)
 loss = []
 
 for lr in lrs:
@@ -78,8 +78,8 @@ lr_min_loss = lrs[np.argmin(loss)]
 
 print('**********************************************')
 print('**********************************************')
-print ('NORMAL min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss))
+print ('FINE min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss))
 print('**********************************************')
 
-f.write('NORMAL min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss) + '\n')
+f.write('FINE min_loss of ' + str(min_loss) + ' with lr: ' + str(lr_min_loss) + '\n')
 f.close()

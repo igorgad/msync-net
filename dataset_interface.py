@@ -99,13 +99,13 @@ def scale_signals(parsed_features, data_params):
 
 def add_random_delay(parsed_features, data_params):
     num_signals = tf.shape(parsed_features['signals'])[0]
-    delay = tf.stack([1, (data_params['max_delay'] - tf.random_uniform([1], 1, 2 * data_params['max_delay'], dtype=tf.int32)[0])])
+    delay = tf.stack([1, (data_params['max_delay'] - tf.random_uniform([1], 0, 2 * data_params['max_delay'], dtype=tf.int32)[0])])
 
     def add_delay(signals, signal_index):
         pos_delay_func = lambda: tf.concat([tf.zeros(delay[signal_index], dtype=tf.float32), signals[signal_index, 0:-delay[signal_index]]], axis=0)
         neg_delay_func = lambda: tf.concat([signals[signal_index, tf.abs(delay[signal_index]):-1], tf.zeros(tf.abs(delay[signal_index]) + 1, dtype=tf.float32)], axis=0)
 
-        return tf.cond(delay[signal_index] < 0, neg_delay_func, pos_delay_func)
+        return tf.cond(delay[signal_index] <= 0, neg_delay_func, pos_delay_func)
 
     parsed_features['delay'] = delay
     parsed_features['signals'] = tf.map_fn(lambda sig: add_delay(parsed_features['signals'], sig), tf.range(num_signals), dtype=tf.float32, infer_shape=False, parallel_iterations=2)
@@ -119,7 +119,19 @@ def frame_signals(parsed_features, data_params):
     return parsed_features
 
 
-def remove_non_active_frames(parsed_features, data_params, th=0.3):
+def unframe_signals(parsed_features, data_params):
+    parsed_features['signals'] = tf.reshape(parsed_features['signals'], [tf.shape(parsed_features['signals'])[0], -1])
+    parsed_features['activations'] = tf.reshape(parsed_features['activations'], [tf.shape(parsed_features['activations'])[0], -1])
+    return parsed_features
+
+
+def limit_signal_size(parsed_features, data_params, secs=25):
+    parsed_features['signals'] = tf.gather(parsed_features['signals'], tf.range(tf.minimum(secs * data_params['sample_rate'], tf.shape(parsed_features['signals'])[-1])), axis=-1)
+    parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(secs * data_params['sample_rate'], tf.shape(parsed_features['signals'])[-1])), axis=-1)
+    return parsed_features
+
+
+def remove_non_active_frames(parsed_features, data_params, th=0.5):
     active_frames = tf.where(tf.reduce_all(tf.greater_equal(tf.reduce_mean(parsed_features['activations'], axis=-1), th), axis=0))[:, 0]
     parsed_features['signals'] = tf.gather(parsed_features['signals'], active_frames, axis=1)
     parsed_features['activations'] = tf.gather(parsed_features['activations'], active_frames, axis=1)
@@ -177,10 +189,13 @@ def base_pipeline(data_params):
     if data_params['debug_auto']:
         tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY 0.21
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params)).cache()
+    tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4).cache()
+    tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
     return tfdataset

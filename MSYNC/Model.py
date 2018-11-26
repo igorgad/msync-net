@@ -15,9 +15,9 @@ class MSYNCModel:
 
         vggout = vggish(logmel, trainable=~self.use_pretrain, name=name)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128, activation='elu'), name=name+'fc1')(vggout)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name+'bn1')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name+'fc2')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128, activation='elu'), name=name + 'fc1')(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(rate=0.5), name=name + 'dropout1')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name + 'fc2')(output)
 
         model = tf.keras.Model(input, output, name=name)
         if self.use_pretrain:
@@ -50,6 +50,7 @@ class LogMel(tf.keras.layers.Layer):
         mel.set_shape(stft.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
         mel_log = tf.log(mel + 0.01)
         mel_log = tf.expand_dims(mel_log, -1)
+        mel_log = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), mel_log)
 
         tf.summary.image('logmel', mel_log)
         return mel_log
