@@ -15,11 +15,9 @@ class MSYNCModel:
 
         vggout = vggish(logmel, trainable=~self.use_pretrain, name=name)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name+'bn1')(vggout)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name+'fc1')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name+'bn2')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.LeakyReLU(alpha=0.3), name=name+'leakyRelu')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name+'fc2')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128, activation='elu'), name=name + 'fc1')(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'bn1')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name + 'fc2')(output)
 
         model = tf.keras.Model(input, output, name=name)
         if self.use_pretrain:
