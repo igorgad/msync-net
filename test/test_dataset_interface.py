@@ -16,8 +16,8 @@ data_params = {'sample_rate': 16000,
                'random_batch_size': 16,  # For training
                'sequential_batch_size': 8,  # For validation
                'max_delay': 4 * 15360,
-               'instrument_1': 'bassoon' if dataset == 'bach10' else 'clean electric guitar',         # Only valid for MedleyDB dataset
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'acoustic guitar',  #'piano',  # Only valid for MedleyDB dataset
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',         # Only valid for MedleyDB dataset
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',  #'piano',  # Only valid for MedleyDB dataset
                'debug_auto': False
                }
 
@@ -34,20 +34,22 @@ sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
 tfdataset = dts.base_pipeline(data_params)
-train_dataset = tfdataset.filter(dts.select_train_examples).prefetch(32)
-val_dataset = tfdataset.filter(dts.select_val_examples).prefetch(32)
+train_dataset = tfdataset.filter(dts.select_train_examples).repeat(10).prefetch(32)
+val_dataset = tfdataset.filter(dts.select_val_examples).repeat(10).prefetch(32)
 
 # train_dataset, val_dataset = dts.pipeline(data_params)
 # ex = train_dataset.make_one_shot_iterator().get_next()
 # stft = tf.pow(tf.abs(tf.contrib.signal.stft(ex['signals'], 1600, 160, pad_end=True)), 2)
 
 st = time.time()
-
+rt = []
+rv = []
 try:
     num_ex_train = 0
     ex = train_dataset.make_one_shot_iterator().get_next()
     while True:
         r = sess.run(ex)
+        rt.append(r['folder'])
         # plt.clf()
         # plt.plot(r[0]['v1input'].reshape(-1))
         # plt.plot(r[0]['v2input'].reshape(-1))
@@ -62,6 +64,7 @@ try:
     ex = val_dataset.make_one_shot_iterator().get_next()
     while True:
         r = sess.run(ex)
+        rv.append(r['folder'])
         # plt.clf()
         # plt.plot(r[0]['v1input'].reshape(-1))
         # plt.plot(r[0]['v2input'].reshape(-1))
