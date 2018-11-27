@@ -13,15 +13,15 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 16,  # For training
-               'sequential_batch_size': 8,  # For validation
+               'random_batch_size': 16,
+               'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
-               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',         # Only valid for MedleyDB dataset
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',  #'piano',  # Only valid for MedleyDB dataset
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
+               'split_seed': 2,
+               'split_rate': 0.7,
                'debug_auto': False
                }
-
-
 
 data_params['scale_value'] = 1.0
 data_params['shuffle_buffer'] = 32
@@ -34,8 +34,8 @@ sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
 tfdataset = dts.base_pipeline(data_params)
-train_dataset = tfdataset.filter(dts.select_train_examples).repeat(10).prefetch(32)
-val_dataset = tfdataset.filter(dts.select_val_examples).repeat(10).prefetch(32)
+train_dataset = tfdataset.filter(dts.select_train_examples).prefetch(32)
+val_dataset = tfdataset.filter(dts.select_val_examples).prefetch(32)
 
 # train_dataset, val_dataset = dts.pipeline(data_params)
 # ex = train_dataset.make_one_shot_iterator().get_next()
@@ -49,14 +49,14 @@ try:
     ex = train_dataset.make_one_shot_iterator().get_next()
     while True:
         r = sess.run(ex)
-        rt.append(r['folder'])
-        # plt.clf()
-        # plt.plot(r[0]['v1input'].reshape(-1))
-        # plt.plot(r[0]['v2input'].reshape(-1))
-        # plt.title('delay = ' + str(data_params['example_length'] * np.nonzero(r[1])[0][0]))
+        plt.clf()
+        fig, [ax1, ax2] = plt.subplots(2,1)
+        ax1.plot(r['signals'][0].reshape(-1))
+        ax2.plot(r['signals'][1].reshape(-1))
+        plt.title('delay = ' + str(r['delay'][1] - r['delay'][0]))
         num_ex_train += 1
 except Exception as e:
-    # print (str(e))
+    print (str(e))
     pass
 
 try:

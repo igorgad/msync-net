@@ -26,6 +26,8 @@ data_params = {'sample_rate': 16000,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
+               'split_seed': 2,
+               'split_rate': 0.7,
                'debug_auto': False
                }
 
