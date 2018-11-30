@@ -9,7 +9,7 @@ def create_ave_image(ecl_distance, targets):
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)
     # ax.set_ylim(0.0, 1.0)
-    ax.plot(np.arange(-ecl_distance.shape[1] //2, ecl_distance.shape[1] // 2), ecl_distance[0,:])
+    ax.plot(np.arange(-ecl_distance.shape[1] //2 + 1, ecl_distance.shape[1] // 2 + 1), ecl_distance[0,:])
     ax.axvline(np.argmax(targets[0,:]) - targets[0,:].size//2)
     # ax.set_title('dist = ' + str(dist))
     return fig

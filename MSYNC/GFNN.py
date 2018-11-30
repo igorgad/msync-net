@@ -14,8 +14,8 @@ class GFNN:
         if osc_params is not None:
             self._osc_params = osc_params
         else:
-            self._osc_params = {'f_min': 0.125,
-                                'f_max': 8.0,
+            self._osc_params = {'f_min': 125,
+                                'f_max': 3800.0,
                                 'alpha': 0.0,
                                 'beta1': -10.0,
                                 'beta2': 0.0,
@@ -138,17 +138,17 @@ class GFNNLayer(tf.keras.layers.Layer):
         if inputs.dtype != tf.complex64:
             inputs = tf.complex(inputs, 0.0)
 
-        z_state = tf.abs(self.gfnn.run(inputs)[0])
+        z_state = tf.abs(self.gfnn.run(inputs)[0])[:, -92:, :]
         z_state = tf.expand_dims(z_state, axis=-1)
 
-        # tf.summary.image('z_state', z_state)
+        tf.summary.image('z_state', z_state)
         return z_state
 
     def build(self, input_shape):
         super(GFNNLayer, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0],  input_shape[-1], self.gfnn._num_osc, 1))
+        return tf.TensorShape((input_shape[0],  92, self.gfnn._num_osc, 1))
 
 
 class HebCon:
