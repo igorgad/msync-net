@@ -140,6 +140,7 @@ class GFNNLayer(tf.keras.layers.Layer):
 
         z_state = tf.abs(self.gfnn.run(inputs)[0])[:, -92:, :]
         z_state = tf.expand_dims(z_state, axis=-1)
+        z_state = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), z_state)
 
         tf.summary.image('z_state', z_state)
         return z_state

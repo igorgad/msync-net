@@ -8,6 +8,7 @@ import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+tf.set_random_seed(0)
 
 train_params = {'lr': 6.2849e-5,
                 'drop_lr': 1e-6,
