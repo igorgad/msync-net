@@ -165,8 +165,8 @@ def prepare_examples(parsed_features, data_params):
     return example
 
 
-def resample_train_test(parsed_features, train_test_ratio=0.8):
-    parsed_features['is_train'] = tf.less_equal(tf.random_uniform([1], 0, 100, dtype=tf.float32)[0], train_test_ratio * 100)
+def resample_train_test(parsed_features, data_params):
+    parsed_features['is_train'] = tf.less_equal(tf.random_uniform([1], 0, 100, dtype=tf.float32, seed=data_params['split_seed'])[0], data_params['split_rate'] * 100)
     return parsed_features
 
 
@@ -187,13 +187,15 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: compute_activations(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: mix_similar_instruments(feat, data_params), num_parallel_calls=4)
     if data_params['debug_auto']:
-        tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY 0.21
+        tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4).cache()
+    tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=4)  # must be used prior to cache()
+    tfdataset = tfdataset.cache()
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
