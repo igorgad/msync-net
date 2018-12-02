@@ -4,23 +4,27 @@ from MSYNC.vggish import vggish
 
 
 class MSYNCModel:
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, use_pretrain=False):
         self.input_shape = input_shape
+        self.use_pretrain = use_pretrain
         self.model = None
 
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')       
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
-        vggout = vggish(logmel, name=name)
+        vggout = vggish(logmel, trainable=~self.use_pretrain, name=name)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name+'fc1/fc')(vggout)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name+'fc1/bn')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name+'fc1/elu')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(rate=0.5), name=name+'fc1/dropout')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name+'fc2/fc')(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc1')(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization())(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU())(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(rate=0.5), name=name + 'dropout1')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name + 'fc2')(vggout)
 
         model = tf.keras.Model(input, output, name=name)
+        if self.use_pretrain:
+            model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
+            model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
         return model
 
     def build_model(self):
