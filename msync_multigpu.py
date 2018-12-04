@@ -15,7 +15,7 @@ train_params = {'lr': 1e-4,
                 'pretrain': False
                 }
 
-dataset = 'medleydb'
+dataset = 'bach10'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
@@ -27,7 +27,7 @@ data_params = {'sample_rate': 16000,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 2,
-               'split_rate': 0.7,
+               'split_rate': 0.8,
                'debug_auto': False
                }
 
@@ -50,11 +50,10 @@ lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_para
 callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
 
 # Get Model on CPU
-with tf.device('/cpu:0'):
-    msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), use_pretrain=train_params['pretrain'])
-    model = msync_model.build_model()
-    model.summary()
+msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
+model = msync_model.build_model()
+model.summary()
 
-parallel_model = tf.keras.utils.multi_gpu_model(model, gpus=4)
+parallel_model = tf.keras.utils.multi_gpu_model(model, gpus=4, cpu_merge=False)
 parallel_model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
 parallel_model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
