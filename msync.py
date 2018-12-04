@@ -27,7 +27,7 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False
                }
 
-logname = 'master-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'kfold-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
@@ -42,8 +42,8 @@ train_data, validation_data = dts.train_val_pipeline(data_params)
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=8, batch_size=data_params['random_batch_size'], write_images=True)
-lr_scheduler = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=0, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
-callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
+lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=0, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+callbacks = [checkpoint, tensorboard, lr_reducer, early_stop]
 
 # Get Model
 msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
