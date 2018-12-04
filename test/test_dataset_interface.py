@@ -13,18 +13,19 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 16,  # For training
+               'random_batch_size': 24,  # For training
                'sequential_batch_size': 8,  # For validation
                'max_delay': 4 * 15360,
-               'instrument_1': 'bassoon' if dataset == 'bach10' else 'drum set',         # Only valid for MedleyDB dataset
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',  #'piano',  # Only valid for MedleyDB dataset
-               'debug_auto': False
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',         # Only valid for MedleyDB dataset
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',  # Only valid for MedleyDB dataset
+               'debug_auto': False,
+               'scale_value': 1.0,
+               'shuffle_buffer': 1,
+               'dataset_file': dataset_file,
+               'audio_root': dataset_audio_root,
+               'split_seed': 2,
+               'split_rate': 0.8
                }
-
-data_params['scale_value'] = 1.0
-data_params['shuffle_buffer'] = 32
-data_params['dataset_file'] = dataset_file
-data_params['audio_root'] = dataset_audio_root
 
 config = tf.ConfigProto(log_device_placement=False, allow_soft_placement=True)
 config.gpu_options.allow_growth = True
@@ -64,7 +65,7 @@ try:
         # plt.plot(r[0]['v1input'].reshape(-1))
         # plt.plot(r[0]['v2input'].reshape(-1))
         # plt.title('delay = ' + str(data_params['example_length'] * np.nonzero(r[1])[0][0]))
-        plt.pause(0.1)
+        # plt.pause(0.1)
         num_ex_val += 1
 except Exception as e:
     # print(str(e))
