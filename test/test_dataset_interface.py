@@ -19,7 +19,7 @@ data_params = {'sample_rate': 16000,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 2,
-               'split_rate': 0.7,
+               'num_folds': 5,
                'debug_auto': False
                }
 
@@ -34,8 +34,8 @@ sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
 tfdataset = dts.base_pipeline(data_params)
-train_dataset = tfdataset.filter(dts.select_train_examples).prefetch(32)
-val_dataset = tfdataset.filter(dts.select_val_examples).prefetch(32)
+train_dataset = tfdataset.filter(lambda feat: dts.select_folds(feat, np.arange(data_params['num_folds'] - 1, dtype=np.int32))).prefetch(32)
+val_dataset = tfdataset.filter(lambda feat: dts.select_folds(feat, [data_params['num_folds'] - 1])).prefetch(32)
 
 # train_dataset, val_dataset = dts.pipeline(data_params)
 # ex = train_dataset.make_one_shot_iterator().get_next()
@@ -49,14 +49,14 @@ try:
     ex = train_dataset.make_one_shot_iterator().get_next()
     while True:
         r = sess.run(ex)
-        plt.clf()
-        fig, [ax1, ax2] = plt.subplots(2,1)
-        ax1.plot(r['signals'][0].reshape(-1))
-        ax2.plot(r['signals'][1].reshape(-1))
-        plt.title('delay = ' + str(r['delay'][1] - r['delay'][0]))
+        # plt.clf()
+        # fig, [ax1, ax2] = plt.subplots(2,1)
+        # ax1.plot(r['signals'][0].reshape(-1))
+        # ax2.plot(r['signals'][1].reshape(-1))
+        # plt.title('delay = ' + str(r['delay'][1] - r['delay'][0]))
         num_ex_train += 1
 except Exception as e:
-    print (str(e))
+    # print (str(e))
     pass
 
 try:

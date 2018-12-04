@@ -179,6 +179,15 @@ def select_val_examples(parsed_features):
     return tf.logical_not(parsed_features['is_train'])
 
 
+def resample_folds(parsed_features, data_params):
+    parsed_features['fold'] = tf.random_uniform([1], 0, data_params['num_folds'], dtype=tf.int32, seed=data_params['split_seed'])[0]
+    return parsed_features
+
+
+def select_folds(parsed_features, folds):
+    return tf.reduce_any(tf.equal(folds, parsed_features['fold']))
+
+
 def base_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
     tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
@@ -195,7 +204,7 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
+    tfdataset = tfdataset.map(lambda feat: resample_folds(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.cache()
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
@@ -206,11 +215,30 @@ def base_pipeline(data_params):
     return tfdataset
 
 
-def pipeline(data_params):
+def train_val_pipeline(data_params):
     tfdataset = base_pipeline(data_params)
-    train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
-    val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    train_dataset = tfdataset.filter(lambda feat: select_folds(feat, np.arange(data_params['num_folds'] - 1, dtype=np.int32)))
+    val_dataset = tfdataset.filter(lambda feat: select_folds(feat, [data_params['num_folds'] - 1]))
+
+    train_dataset = train_dataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    val_dataset = val_dataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
     train_dataset = train_dataset.apply(tf.contrib.data.shuffle_and_repeat(data_params['shuffle_buffer'])).batch(data_params['random_batch_size']).prefetch(32)
     val_dataset = val_dataset.apply(tf.contrib.data.shuffle_and_repeat(data_params['shuffle_buffer'])).batch(data_params['random_batch_size']).prefetch(32)
     return train_dataset, val_dataset
+
+
+def kfold_pipeline(data_params, train_folds, val_folds, test_folds):
+    tfdataset = base_pipeline(data_params)
+    train_dataset = tfdataset.filter(lambda feat: select_folds(feat, train_folds))
+    val_dataset = tfdataset.filter(lambda feat: select_folds(feat, val_folds))
+    test_dataset = tfdataset.filter(lambda feat: select_folds(feat, test_folds))
+
+    train_dataset = train_dataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    val_dataset = val_dataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    test_dataset = test_dataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+
+    train_dataset = train_dataset.apply(tf.contrib.data.shuffle_and_repeat(data_params['shuffle_buffer'])).batch(data_params['random_batch_size']).prefetch(32)
+    val_dataset = val_dataset.apply(tf.contrib.data.shuffle_and_repeat(data_params['shuffle_buffer'])).batch(data_params['random_batch_size']).prefetch(32)
+    test_dataset = test_dataset.apply(tf.contrib.data.shuffle_and_repeat(data_params['shuffle_buffer'])).batch(data_params['random_batch_size']).prefetch(32)
+    return train_dataset, val_dataset, test_dataset
