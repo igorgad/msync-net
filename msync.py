@@ -45,12 +45,12 @@ train_data, validation_data = dts.pipeline(data_params)
 # Set Callbacks
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
-tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=4, batch_size=data_params['random_batch_size'], write_images=True)
+tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=8, batch_size=data_params['random_batch_size'], write_images=True)
 lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(train_params['drop_lr'], np.floor((1 + epoch) / train_params['drop_epoch'])))
 callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
 
 # Get Model
-msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), use_pretrain=train_params['pretrain'])
+msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
 model = msync_model.build_model()
 model.summary()
 model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])

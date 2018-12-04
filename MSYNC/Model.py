@@ -4,25 +4,25 @@ from MSYNC.vggish import vggish
 
 
 class MSYNCModel:
-    def __init__(self, input_shape, use_pretrain=False):
+    def __init__(self, input_shape):
         self.input_shape = input_shape
-        self.use_pretrain = use_pretrain
         self.model = None
+        self.dropout_rate = 0.5
 
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
-        vggout = vggish(logmel, trainable=~self.use_pretrain, name=name)
+        vggout = vggish(logmel, name=name)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128, activation='elu'), name=name + 'fc1')(vggout)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(rate=0.5), name=name + 'dropout1')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name + 'fc2')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(rate=self.dropout_rate), name=name + 'fc_block1/dropout')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(vggout)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
 
         model = tf.keras.Model(input, output, name=name)
-        if self.use_pretrain:
-            model.load_weights('./saved_models/v1VGGish.h5', by_name=True)
-            model.load_weights('./saved_models/v2VGGish.h5', by_name=True)
         return model
 
     def build_model(self):
@@ -45,20 +45,20 @@ class LogMel(tf.keras.layers.Layer):
     def call(self, inputs, *args, **kwargs):
         inputs = tf.convert_to_tensor(inputs)
 
-        stft = tf.abs(tf.contrib.signal.stft(inputs, 400, 160, pad_end=True))
-        mel = tf.tensordot(stft, self.mel_matrix, 1)
-        mel.set_shape(stft.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
-        mel_log = tf.log(mel + 0.01)
-        mel_log = tf.expand_dims(mel_log, -1)
-        mel_log = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), mel_log)
+        output = tf.abs(tf.contrib.signal.stft(inputs, 1600, 160, pad_end=True))
+        output = tf.tensordot(output, self.mel_matrix, 1)
+        output.set_shape(output.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
+        output = tf.log(output + 0.01)
+        output = tf.expand_dims(output, -1)
+        output = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), output)
 
-        tf.summary.image('logmel', mel_log)
-        return mel_log
+        tf.summary.image('mel_log', output)
+        return output
 
     def build(self, input_shape):
         self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
-            num_mel_bins=64,
-            num_spectrogram_bins=257,
+            num_mel_bins=128,
+            num_spectrogram_bins=1025,
             sample_rate=16000,
             lower_edge_hertz=125.0,
             upper_edge_hertz=7500.0,
@@ -69,7 +69,7 @@ class LogMel(tf.keras.layers.Layer):
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 64, 1))
+        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128, 1))
 
 
 class EclDistanceMat(tf.keras.layers.Layer):
