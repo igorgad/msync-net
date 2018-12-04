@@ -9,11 +9,7 @@ from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-train_params = {'lr': 1e-4,
-                'drop_lr': 0.1,
-                'drop_epoch': 5,
-                'pretrain': False
-                }
+train_params = {'lr': 6.2849e-5}
 
 dataset = 'bach10'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
@@ -27,7 +23,7 @@ data_params = {'sample_rate': 16000,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 2,
-               'split_rate': 0.7,
+               'split_rate': 0.8,
                'debug_auto': False
                }
 
@@ -46,8 +42,8 @@ train_data, validation_data = dts.pipeline(data_params)
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=8, batch_size=data_params['random_batch_size'], write_images=True)
-lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(train_params['drop_lr'], np.floor((1 + epoch) / train_params['drop_epoch'])))
-callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
+lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=1e-5, patience=10, verbose=0, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+callbacks = [checkpoint, tensorboard, lr_reducer, early_stop]
 
 # Get Model
 msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
