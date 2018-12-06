@@ -1,6 +1,6 @@
 
 import tensorflow as tf
-# from MSYNC.vggish import vggish
+from MSYNC.vggish import vgg_encoder, vgg_decoder
 
 
 class MSYNCModel:
@@ -13,14 +13,11 @@ class MSYNCModel:
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')       
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
-        # vggout = vggish(logmel, name=name)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128), name=name + 'lstm_encoder/lstm1')(encoded)
-        decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.RepeatVector(96), name=name+'lstm_decoder/rept_vec')(encoded)
-        decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_decoder/lstm1')(decoded)
-        decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name + 'lstm_decoder/lstm0')(decoded)
+        encoded = vgg_encoder(logmel, name=name)
+        decoded = vgg_decoder(encoded, name=name)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block1/fc')(encoded)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block1/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
