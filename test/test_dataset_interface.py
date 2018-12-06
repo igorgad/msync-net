@@ -19,8 +19,8 @@ data_params = {'sample_rate': 16000,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 2,
-               'split_rate': 0.7,
-               'debug_auto': False
+               'split_rate': 0.8,
+               'debug_auto': True
                }
 
 data_params['scale_value'] = 1.0
@@ -34,46 +34,41 @@ sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
 tfdataset = dts.base_pipeline(data_params)
-train_dataset = tfdataset.filter(dts.select_train_examples).prefetch(32)
-val_dataset = tfdataset.filter(dts.select_val_examples).prefetch(32)
+train_dataset = tfdataset.filter(dts.select_train_examples).repeat(100).prefetch(32)
+val_dataset = tfdataset.filter(dts.select_val_examples).repeat(100).prefetch(32)
 
 # train_dataset, val_dataset = dts.pipeline(data_params)
-# ex = train_dataset.make_one_shot_iterator().get_next()
-# stft = tf.pow(tf.abs(tf.contrib.signal.stft(ex['signals'], 1600, 160, pad_end=True)), 2)
 
 st = time.time()
 rt = []
 rv = []
-try:
-    num_ex_train = 0
-    ex = train_dataset.make_one_shot_iterator().get_next()
-    while True:
-        r = sess.run(ex)
-        plt.clf()
-        fig, [ax1, ax2] = plt.subplots(2,1)
-        ax1.plot(r['signals'][0].reshape(-1))
-        ax2.plot(r['signals'][1].reshape(-1))
-        plt.title('delay = ' + str(r['delay'][1] - r['delay'][0]))
-        num_ex_train += 1
-except Exception as e:
-    print (str(e))
-    pass
+num_epochs = 0
 
-try:
-    num_ex_val = 0
-    ex = val_dataset.make_one_shot_iterator().get_next()
-    while True:
-        r = sess.run(ex)
-        rv.append(r['folder'])
-        # plt.clf()
-        # plt.plot(r[0]['v1input'].reshape(-1))
-        # plt.plot(r[0]['v2input'].reshape(-1))
-        # plt.title('delay = ' + str(data_params['example_length'] * np.nonzero(r[1])[0][0]))
-        plt.pause(0.1)
-        num_ex_val += 1
-except Exception as e:
-    # print(str(e))
-    pass
+while num_epochs < 10:
+    try:
+        num_ex_train = 0
+        ex = train_dataset.make_one_shot_iterator().get_next()
+        while num_ex_train < 30:
+            r = sess.run(ex)
+            rt.append(r['folder'])
+            num_ex_train += 1
+    except Exception as e:
+        # print (str(e))
+        pass
+
+    try:
+        num_ex_val = 0
+        ex = val_dataset.make_one_shot_iterator().get_next()
+        while num_ex_val < 30:
+            r = sess.run(ex)
+            rv.append(r['folder'])
+            num_ex_val += 1
+    except Exception as e:
+        # print(str(e))
+        pass
+
+    num_epochs += 1
+
 
 print (time.time() - st)
 t = num_ex_val + num_ex_train
