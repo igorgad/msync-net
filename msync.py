@@ -8,12 +8,9 @@ import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-tf.set_random_seed(0)
+tf.set_random_seed(26)
 
-train_params = {'lr': 6.2849e-5
-#                 'drop_lr': 1e-6,
-#                 'drop_epoch': 23,
-                }
+train_params = {'lr': 6.2849e-5 }
 
 dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
@@ -28,7 +25,7 @@ data_params = {'sample_rate': 16000,
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'racc68-rmsprop-fcBN-7k100ms-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'all_finder-likebefore-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
@@ -45,14 +42,14 @@ train_data, validation_data = dts.pipeline(data_params)
 # Set callbacks
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
-tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=4, batch_size=data_params['random_batch_size'], write_images=True)
-lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(train_params['drop_lr'], np.floor((1 + epoch) / train_params['drop_epoch'])))
-callbacks = [checkpoint, tensorboard]
+tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=0, batch_size=data_params['random_batch_size'], write_images=True)
+lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+callbacks = [checkpoint, tensorboard, lr_reducer]
 
 # Get Model
-msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), use_pretrain=False)
+msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
 model = msync_model.build_model()
 model.summary()
-model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.RMSprop(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
-model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
+model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
+model.fit(train_data, epochs=70, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
 print (logname)
