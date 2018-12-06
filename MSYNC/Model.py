@@ -23,7 +23,7 @@ class MSYNCModel:
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block1/fc')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(64), name=name + 'fc_block2/fc')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
 
         decoded_mse = MSELayer(name=name+'ae')([decoded, logmel])

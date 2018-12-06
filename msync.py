@@ -8,7 +8,7 @@ import MSYNC.stats as stats
 from MSYNC.Model import MSYNCModel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-tf.set_random_seed(26)
+tf.set_random_seed(0)
 
 train_params = {'lr': 6.2849e-5}
 
@@ -18,14 +18,14 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 24,
+               'random_batch_size': 64,
                'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'with_ae-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'with_ae-lstm-128feat' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
