@@ -172,7 +172,7 @@ def compute_one_hot_delay(parsed_features, data_params):
 
 def prepare_examples(parsed_features, data_params):
     data = {'v1input': parsed_features['signals'][0], 'v2input': parsed_features['signals'][1]}
-    labels = parsed_features['one_hot_delay']
+    labels = {'v1ae': tf.constant((0.0,), dtype=tf.float32), 'v2ae': tf.constant(0.0, tf.float32), 'ecl_softmax': parsed_features['one_hot_delay']}
     example = data, labels
     return example
 
@@ -225,3 +225,4 @@ def pipeline(data_params):
     train_dataset = train_dataset.shuffle(data_params['shuffle_buffer']).repeat().batch(data_params['random_batch_size']).prefetch(32)
     val_dataset = val_dataset.shuffle(data_params['shuffle_buffer']).repeat().batch(data_params['random_batch_size']).prefetch(32)
     return train_dataset, val_dataset
+

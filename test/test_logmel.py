@@ -1,50 +1,47 @@
 
 import tensorflow as tf
 import numpy as np
-import dataset_interface
+import dataset_interface as dts
 import matplotlib.pyplot as plt
-from MSYNC.Model import logmel_func
-import importlib
-importlib.reload(dataset_interface)
+from MSYNC.Model import LogMel
 
-data_params = {'dataset_file': './data/BACH10/MSYNC-bach10.tfrecord',
-               'audio_root': './data/BACH10/Audio',
-               'sample_rate': 16000,
-               'example_length': 15360,
-               'batch_size': 64,
-               'repeat': 100000,
-               'shuffle_buffer': 4,
-               'scale_value': 1.0,
-               'max_delay': 15360 // 20
+
+dataset = 'bach10'
+dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
+dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
+
+data_params = {'sample_rate': 16000,
+               'example_length': 15360,  # almost 1 second of audio
+               'random_batch_size': 1,
+               'sequential_batch_size': 1,
+               'max_delay': 2,
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
+               'split_seed': 2,
+               'split_rate': 0.8,
+               'debug_auto': False
                }
 
+# Get data pipelines
+data_params['scale_value'] = 1.0
+data_params['shuffle_buffer'] = 32
+data_params['dataset_file'] = dataset_file
+data_params['audio_root'] = dataset_audio_root
+data = dts.base_pipeline(data_params).make_one_shot_iterator().get_next()
 
-data = dataset_interface.pipeline(data_params)
-ex = data.make_one_shot_iterator().get_next()
-inputs = ex[0]['v1input']
+input = tf.keras.Input(shape=(data_params['example_length'],))
+logmel = LogMel()(input)
+model = tf.keras.Model(input, logmel)
 
-# inputs = np.float32(np.random.rand(1024, 15360))
+sess = tf.keras.backend.get_session()
+fig, (ax1, ax2) = plt.subplots(2,1)
 
-mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
-        num_mel_bins=64,
-        num_spectrogram_bins=257,
-        sample_rate=16000,
-        lower_edge_hertz=125.0,
-        upper_edge_hertz=7500.0,
-        dtype=tf.float32,
-        name=None
-    )
+while True:
+    dt = sess.run(data)
+    r1 = model.predict(dt['signals'][0])
+    r2 = model.predict(dt['signals'][1])
 
+    ax1.imshow(r1[0, :, :, 0], cmap='gray')
+    ax2.imshow(r2[0, :, :, 0], cmap='gray')
+    plt.pause(2)
 
-stft = tf.abs(tf.contrib.signal.stft(inputs, 400, 160, pad_end=True))
-mel = tf.tensordot(stft, mel_matrix, 1)
-mel.set_shape(stft.shape[:-1].concatenate(mel_matrix.shape[-1:]))
-mel_log = tf.log(mel + 0.01)
-mel_log = tf.expand_dims(mel_log, -1)
-
-
-sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
-
-for i in range(1000):
-    r = sess.run(mel_log)
-    print ('run ' + str(i))
