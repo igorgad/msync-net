@@ -12,20 +12,20 @@ tf.set_random_seed(0)
 
 train_params = {'lr': 6.2849e-5}
 
-dataset = 'bach10'
+dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 64,
+               'random_batch_size': 16,
                'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'with_ae-vgg-128feat' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'with_ae-vgg-128feat-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
@@ -52,5 +52,5 @@ model = msync_model.build_model()
 model.summary()
 loss = [tf.keras.losses.mean_absolute_error, tf.keras.losses.mean_absolute_error, tf.keras.losses.categorical_crossentropy]
 model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics={'ecl_softmax': utils.range_categorical_accuracy})
-model.fit(train_data, epochs=70, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
+model.fit(train_data, epochs=100, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
 print (logname)

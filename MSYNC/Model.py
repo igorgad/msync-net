@@ -17,7 +17,7 @@ class MSYNCModel:
         decoded = vgg_decoder(encoded, name=name)
 
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block1/fc')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
@@ -45,7 +45,7 @@ class MSELayer(tf.keras.layers.Layer):
 
     def call(self, inputs, *args, **kwargs):
         yp, yt = inputs
-        return tf.expand_dims(tf.reduce_mean(tf.pow(yp - yt, 2), axis=[-1, -2, -3]), axis=-1)
+        return tf.reduce_mean(tf.pow(yp - yt, 2), axis=[-2, -3, -4])
 
     def build(self, input_shape):
         super(MSELayer, self).build(input_shape)  # Be sure to call this at the end
@@ -68,8 +68,8 @@ class LogMel(tf.keras.layers.Layer):
         output = tf.log(output + 0.01)
         output = tf.expand_dims(output, -1)
         output = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), output)
+        
         tf.summary.image('mel_log', output)
-        output = tf.squeeze(output, -1)
         return output
 
     def build(self, input_shape):
@@ -86,7 +86,7 @@ class LogMel(tf.keras.layers.Layer):
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128))
+        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128, 1))
 
 
 class EclDistanceMat(tf.keras.layers.Layer):
