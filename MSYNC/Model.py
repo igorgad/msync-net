@@ -33,14 +33,14 @@ class MSYNCModel:
         v1_model = self.build_single_branch_model('v1')
         v2_model = self.build_single_branch_model('v2')
 
-        v1v2_mse = MSELayer(name='v1v2ae')([v1_model.output[0], v2_model.get_layer('v2logmel').output])
-        v2v1_mse = MSELayer(name='v2v1ae')([v2_model.output[0], v1_model.get_layer('v1logmel').output])
+        v1_mse = MSELayer(name='v1ae')([v1_model.output[0], v2_model.get_layer('v2logmel').output])
+        v2_mse = MSELayer(name='v2ae')([v2_model.output[0], v1_model.get_layer('v1logmel').output])
 
         ecl_mat_distance = EclDistanceMat()([v1_model.output[1], v2_model.output[1]])
         ecl_mean_distance = DiagMean()(ecl_mat_distance)        
         ecl_softmax = tf.keras.layers.Softmax(name='ecl_softmax')(ecl_mean_distance)
 
-        self.model = tf.keras.Model([v1_model.input, v2_model.input], [v1v2_mse, v2v1_mse, ecl_softmax])
+        self.model = tf.keras.Model([v1_model.input, v2_model.input], [v1_mse, v2_mse, ecl_softmax])
         return self.model
 
 
