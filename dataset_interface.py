@@ -218,11 +218,12 @@ def base_pipeline(data_params):
 
 
 def pipeline(data_params):
-    tfdataset = base_pipeline(data_params)
-    train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
-    val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    with tf.device('/cpu:0'):
+        tfdataset = base_pipeline(data_params)
+        train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+        val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
-    train_dataset = train_dataset.shuffle(data_params['shuffle_buffer']).repeat().batch(data_params['random_batch_size']).prefetch(32)
-    val_dataset = val_dataset.shuffle(data_params['shuffle_buffer']).repeat().batch(data_params['random_batch_size']).prefetch(32)
+        train_dataset = train_dataset.shuffle(data_params['shuffle_buffer']).repeat().batch(data_params['random_batch_size']).prefetch(32)
+        val_dataset = val_dataset.shuffle(data_params['shuffle_buffer']).repeat().batch(data_params['random_batch_size']).prefetch(32)
     return train_dataset, val_dataset
 

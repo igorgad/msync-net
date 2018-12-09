@@ -10,7 +10,7 @@ from MSYNC.Model import MSYNCModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 tf.set_random_seed(0)
 
-train_params = {'lr': 6.2849e-5}
+train_params = {'lr': 1.0e-5}
 
 dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
@@ -25,7 +25,7 @@ data_params = {'sample_rate': 16000,
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'with_ae-vgg-128feat-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'cross_ae-vgg-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
