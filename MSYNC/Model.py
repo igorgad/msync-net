@@ -19,7 +19,7 @@ class MSYNCModel:
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.LeakyReLU(), name=name + 'fc_block1/elu')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
 
