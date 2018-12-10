@@ -17,10 +17,10 @@ class MSYNCModel:
         return encoded
 
     def build_top_model(self, encoded, name=''):
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block1/fc')(encoded)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
-        # output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.dropout_rate), name=name + 'fc_block1/dropout')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.dropout_rate), name=name + 'fc_block1/dropout')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(16), name=name + 'fc_block2/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
         return output
