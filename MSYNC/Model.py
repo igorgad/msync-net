@@ -8,10 +8,9 @@ class MSYNCModel:
         self.input_shape = input_shape
         self.model = None
         self.model_params = model_params
-        self.mel_params = mel_params
 
     def build_encoder_model(self, input, name=''):
-        encoded = tf.keras.layers.TimeDistributed(LogMel(params=self.mel_params), name=name+'logmel')(input)
+        encoded = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name=name+'logmel')(input)
         for layer, units in enumerate(self.model_params['lstm_units'][:-1]):
             encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
         encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(self.model_params['lstm_units'][-1], return_sequences=False), name=name + 'lstm_encoder/lstmFinal')(encoded)
