@@ -14,9 +14,10 @@ class MSYNCModel:
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
         # vggout = vggish(logmel, name=name)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(64, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm1')(encoded)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256, return_sequences=False), name=name+'lstm_encoder/lstm2')(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(32, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(64, return_sequences=True), name=name+'lstm_encoder/lstm1')(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm2')(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256, return_sequences=False), name=name+'lstm_encoder/lstm3')(encoded)
         
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)

@@ -25,7 +25,7 @@ data_params = {'sample_rate': 16000,
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'no_ae-lstm-3lstm-2fc-norm-drop=0.5-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'no_ae-lstm-4lstm-2fc-norm-drop=0.25-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
