@@ -1,8 +1,17 @@
+
 import tensorflow as tf
 import numpy as np
 import os
 
-features = {'folder': tf.VarLenFeature(tf.string), 'is_train': tf.FixedLenFeature(1, tf.int64), 'files': tf.VarLenFeature(tf.string), 'instruments': tf.VarLenFeature(tf.string), 'types': tf.VarLenFeature(tf.string), 'activations': tf.VarLenFeature(tf.string)}
+
+features = {
+        'folder': tf.VarLenFeature(tf.string),
+        'is_train': tf.FixedLenFeature(1, tf.int64),
+        'files': tf.VarLenFeature(tf.string),
+        'instruments': tf.VarLenFeature(tf.string),
+        'types': tf.VarLenFeature(tf.string),
+        'activations': tf.VarLenFeature(tf.string)
+}
 
 
 def is_empty(tensor):
@@ -54,7 +63,8 @@ def compute_activations(parsed_features, data_params):
             lab.append(np.hstack([np.ones(int(dtime[i] / (1 / data_params['sample_rate'])), np.float32) * labmat[b, i] for i in range(dtime.size)]))
         return np.array(lab)
 
-    parsed_features['activations'] = tf.cond(is_empty(parsed_features['activations']), lambda: tf.ones_like(parsed_features['signals']), lambda: tf.py_func(func, [parsed_features['activations']], [tf.float32])[0])
+    parsed_features['activations'] = tf.cond(is_empty(parsed_features['activations']), lambda: tf.ones_like(parsed_features['signals']),
+                                             lambda: tf.py_func(func, [parsed_features['activations']], [tf.float32])[0])
     return parsed_features
 
 
@@ -66,7 +76,7 @@ def mix_similar_instruments(parsed_features, data_params):
     parsed_features['activations'] = tf.map_fn(lambda i: mix_signal(parsed_features['activations'], i), tf.range(tf.shape(unique_instruments.y)[0]), dtype=tf.float32, infer_shape=False)
     parsed_features['types'] = tf.map_fn(mix_types, tf.range(tf.shape(unique_instruments.y)[0]), dtype=tf.string, infer_shape=False)
     parsed_features['instruments'] = unique_instruments.y
-    return parsed_features
+    return  parsed_features
 
 
 def copy_v0_to_vall(parsed_features):
@@ -96,13 +106,14 @@ def generate_delay_values(parsed_features, data_params):
 def add_random_delay(parsed_features, data_params):
     num_signals = tf.shape(parsed_features['signals'])[0]
     delay = parsed_features['delay']
-
+    
     def add_delay(signals, signal_index):
         pos_delay_func = lambda: tf.concat([tf.zeros(delay[signal_index], dtype=tf.float32), signals[signal_index, 0:-delay[signal_index]]], axis=0)
         neg_delay_func = lambda: tf.concat([signals[signal_index, tf.abs(delay[signal_index]):-1], tf.zeros(tf.abs(delay[signal_index]) + 1, dtype=tf.float32)], axis=0)
 
         return tf.cond(delay[signal_index] <= 0, neg_delay_func, pos_delay_func)
 
+    
     parsed_features['signals'] = tf.map_fn(lambda sig: add_delay(parsed_features['signals'], sig), tf.range(num_signals), dtype=tf.float32, infer_shape=False, parallel_iterations=2)
     parsed_features['activations'] = tf.map_fn(lambda sig: add_delay(parsed_features['activations'], sig), tf.range(num_signals), dtype=tf.float32, infer_shape=False, parallel_iterations=2)
     return parsed_features
@@ -161,7 +172,7 @@ def compute_one_hot_delay(parsed_features, data_params):
 
 def prepare_examples(parsed_features, data_params):
     data = {'v1input': parsed_features['signals'][0], 'v2input': parsed_features['signals'][1]}
-    labels = parsed_features['one_hot_delay']
+    labels = {'v1ae': tf.constant((0.0,), dtype=tf.float32), 'v2ae': tf.constant(0.0, tf.float32), 'ecl_softmax': parsed_features['one_hot_delay']}
     example = data, labels
     return example
 
@@ -196,21 +207,23 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
-    tfdataset = tfdataset.cache()
-    tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
+    tfdataset = tfdataset.cache().repeat().shuffle(data_params['shuffle_buffer'])
+    tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: random_select_samples(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
+    tfdataset = tfdataset.map(lambda feat: random_select_samples(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
     return tfdataset
 
 
 def pipeline(data_params):
-    tfdataset = base_pipeline(data_params)
-    train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
-    val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+    with tf.device('/cpu:0'):
+        tfdataset = base_pipeline(data_params)
+        train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+        val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
-    train_dataset = train_dataset.apply(tf.contrib.data.shuffle_and_repeat(data_params['shuffle_buffer'])).batch(data_params['random_batch_size']).prefetch(32)
-    val_dataset = val_dataset.apply(tf.contrib.data.shuffle_and_repeat(data_params['shuffle_buffer'])).batch(data_params['random_batch_size']).prefetch(32)
+        train_dataset = train_dataset.batch(data_params['random_batch_size']).prefetch(1)
+        val_dataset = val_dataset.batch(data_params['random_batch_size']).prefetch(1)
     return train_dataset, val_dataset
+

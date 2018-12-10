@@ -34,8 +34,8 @@ sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
 tfdataset = dts.base_pipeline(data_params)
-train_dataset = tfdataset.filter(dts.select_train_examples).repeat(100).prefetch(32)
-val_dataset = tfdataset.filter(dts.select_val_examples).repeat(100).prefetch(32)
+train_dataset = tfdataset.filter(dts.select_train_examples).prefetch(1)
+val_dataset = tfdataset.filter(dts.select_val_examples).prefetch(1)
 
 # train_dataset, val_dataset = dts.pipeline(data_params)
 
