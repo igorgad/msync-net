@@ -19,7 +19,8 @@ class MSYNCModel:
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.LeakyReLU(), name=name + 'fc_block1/lrelu')(output)
+#         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.dropout_rate), name=name + 'fc_block1/dropout')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
 
@@ -34,7 +35,7 @@ class MSYNCModel:
         v2_mse = MSELayer(name='v2ae')([v2_model.output[0], v1_model.get_layer('v1logmel').output])
 
         ecl_mat_distance = EclDistanceMat()([v1_model.output[1], v2_model.output[1]])
-        ecl_mean_distance = DiagMean()(ecl_mat_distance)        
+        ecl_mean_distance = DiagMean()(ecl_mat_distance)
         ecl_softmax = tf.keras.layers.Softmax(name='ecl_softmax')(ecl_mean_distance)
 
         self.model = tf.keras.Model([v1_model.input, v2_model.input], [v1_mse, v2_mse, ecl_softmax])
@@ -47,6 +48,7 @@ class MSELayer(tf.keras.layers.Layer):
 
     def call(self, inputs, *args, **kwargs):
         yp, yt = inputs
+        tf.summary.image('decoded', tf.gather(yp, 0, axis=1))
         return tf.reduce_mean(tf.pow(yp - yt, 2), axis=[-2, -3, -4])
 
     def build(self, input_shape):
