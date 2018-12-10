@@ -7,19 +7,21 @@ class MSYNCModel:
     def __init__(self, input_shape):
         self.input_shape = input_shape
         self.model = None
-        self.dropout_rate = 0.5
+        self.dropout_rate = 0.25
 
     def build_single_branch_model(self, name=''):
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')       
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
         # vggout = vggish(logmel, name=name)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256), name=name + 'lstm_encoder/lstm1')(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(64, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm1')(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256, return_sequences=False), name=name+'lstm_encoder/lstm2')(encoded)
         
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.dropout_rate), name=name + 'fc_block1/dropout')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
 
@@ -79,7 +81,7 @@ class EclDistanceMat(tf.keras.layers.Layer):
         super(EclDistanceMat, self).__init__(**kwargs)
 
     def distance(self, x, y):
-        return tf.sqrt(tf.maximum(tf.reduce_sum(tf.pow(x - y, 2), axis=-1, keepdims=True), tf.keras.backend.epsilon()))
+        return tf.sqrt(tf.maximum(tf.norm(tf.pow(x - y, 2), axis=-1, keepdims=True), tf.keras.backend.epsilon()))
 
     def call(self, inputs, *args, **kwargs):
         x, y = inputs
