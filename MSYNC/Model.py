@@ -4,43 +4,58 @@ import tensorflow as tf
 
 
 class MSYNCModel:
-    def __init__(self, input_shape):
+    def __init__(self, input_shape, model_params):
         self.input_shape = input_shape
         self.model = None
-        self.dropout_rate = 0.3
+        self.model_params = model_params
 
-    def build_single_branch_model(self, name=''):
-        input = tf.keras.Input(shape=self.input_shape, name=name+'input')       
-        logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
+    def build_encoder(self, encoded, name=''):
+        for layer, units in enumerate(self.model_params['lstm_units'][:-1]):
+            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(units, return_sequences=True), name=name + 'lstm_encoder/lstm' + str(layer))(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(self.model_params['lstm_units'][-1], return_sequences=False), name=name + 'lstm_encoder/lstmFinal')(encoded)
+        return encoded
 
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256), name=name + 'lstm_encoder/lstm1')(encoded)
-        decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.RepeatVector(96), name=name+'lstm_decoder/rept_vec')(encoded)
-        decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256, return_sequences=True), name=name+'lstm_decoder/lstm1')(decoded)
-        decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name + 'lstm_decoder/lstm0')(decoded)
+    def build_decoder(self, encoded, name=''):
+        decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.RepeatVector(96), name=name + 'lstm_decoder/rept_vec')(encoded)
+        for layer, units in enumerate(reversed(self.model_params['lstm_units'])):
+            decoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(units, return_sequences=True), name=name + 'lstm_decoder/lstm' + str(layer))(decoded)
+        return decoded
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(encoded)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.dropout_rate), name=name + 'fc_block1/dropout')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
+    def build_top(self, encoded, name=''):
+        output = encoded
+        for layer, units in enumerate(self.model_params['top_units'][-1:]):
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block%d/fc' % layer)(encoded)
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block%d/bn' % layer)(output)
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block%d/elu' % layer)(output)
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.model_params['dropout']), name=name + 'fc_block%d/dropout' % layer)(output)
 
-        model = tf.keras.Model(input, [decoded, output], name=name)
-        return model
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params['top_units'][-1]), name=name + 'fc_blockFinal/fc')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_blockFinal/bn')(output)
+        return output
 
     def build_model(self):
-        v1_model = self.build_single_branch_model('v1')
-        v2_model = self.build_single_branch_model('v2')
+        v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
+        v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
 
-        v1_mse = MSELayer(name='v1ae')([v1_model.output[0], v2_model.get_layer('v2logmel').output])
-        v2_mse = MSELayer(name='v2ae')([v2_model.output[0], v1_model.get_layer('v1logmel').output])
+        v1_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v1logmel')(v1_input)
+        v2_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v2logmel')(v2_input)
 
-        ecl_mat_distance = EclDistanceMat()([v1_model.output[1], v2_model.output[1]])
-        ecl_mean_distance = DiagMean()(ecl_mat_distance)        
+        v1_encoded = self.build_encoder(v1_logmel, 'v1')
+        v2_encoded = self.build_encoder(v2_logmel, 'v2')
+        v1_decoded = self.build_decoder(v1_encoded, 'v1')
+        v2_decoded = self.build_decoder(v2_encoded, 'v2')
+
+        v1_mse = MSELayer(name='v1ae')([v1_decoded, v1_logmel])
+        v2_mse = MSELayer(name='v2ae')([v2_decoded, v2_logmel])
+
+        v1_top = self.build_top(v1_encoded, 'v1')
+        v2_top = self.build_top(v2_encoded, 'v2')
+
+        ecl_mat_distance = EclDistanceMat()([v1_top, v2_top])
+        ecl_mean_distance = DiagMean()(ecl_mat_distance)
         ecl_softmax = tf.keras.layers.Softmax(name='ecl_softmax')(ecl_mean_distance)
 
-        self.model = tf.keras.Model([v1_model.input, v2_model.input], [v1_mse, v2_mse, ecl_softmax])
+        self.model = tf.keras.Model([v1_input, v2_input], [v1_mse, v2_mse, ecl_softmax])
         return self.model
 
 
@@ -61,14 +76,15 @@ class MSELayer(tf.keras.layers.Layer):
 
 
 class LogMel(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, params, **kwargs):
         self.mel_matrix = None
+        self.params = params
         super(LogMel, self).__init__(**kwargs)
 
     def call(self, inputs, *args, **kwargs):
         inputs = tf.convert_to_tensor(inputs)
 
-        output = tf.abs(tf.contrib.signal.stft(inputs, 1600, 160, pad_end=True))
+        output = tf.abs(tf.contrib.signal.stft(inputs, self.params['stft_window'], self.params['stft_step'], pad_end=True))
         output = tf.tensordot(output, self.mel_matrix, 1)
         output.set_shape(output.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
         output = tf.log(output + 0.01)
@@ -80,11 +96,11 @@ class LogMel(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
-            num_mel_bins=128,
-            num_spectrogram_bins=1025,
-            sample_rate=16000,
-            lower_edge_hertz=125.0,
-            upper_edge_hertz=7500.0,
+            num_mel_bins=self.params['num_mel_bins'],
+            num_spectrogram_bins=self.params['num_spectrogram_bins'],
+            sample_rate=self.params['sample_rate'],
+            lower_edge_hertz=self.params['lower_edge_hertz'],
+            upper_edge_hertz=self.params['upper_edge_hertz'],
             dtype=tf.float32,
             name=None
         )

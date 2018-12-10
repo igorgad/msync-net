@@ -10,7 +10,18 @@ from MSYNC.Model import MSYNCModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 tf.set_random_seed(0)
 
-train_params = {'lr': 1.0e-5}
+model_params = {'lr': 6.3e-5,
+                'stft_window': 1600,
+                'stft_step': 160,
+                'num_mel_bins': 128,
+                'num_spectrogram_bins': 1025,
+                'sample_rate': 16000,
+                'lower_edge_hertz': 125.0,
+                'upper_edge_hertz': 7500.0,
+                'lstm_units': [128, 128, 128],
+                'top_units': [128, 8],
+                'dropout': 0.25
+                }
 
 dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
@@ -25,9 +36,11 @@ data_params = {'sample_rate': 16000,
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'cross_ae-lstm-2lstm2fc-drop=0.3-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
-logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
+logname = 'cross_ae-lstm/' + dataset + '/'
+logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()]) + '/'
+logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in model_params.items()])
 print (logname)
+
 
 # Get data pipelines
 data_params['split_seed'] = 2
@@ -47,10 +60,10 @@ lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5
 callbacks = [checkpoint, tensorboard, lr_reducer]
 
 # Get Model
-msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
+msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), model_params=model_params)
 model = msync_model.build_model()
 model.summary()
 loss = [tf.keras.losses.mean_absolute_error, tf.keras.losses.mean_absolute_error, tf.keras.losses.categorical_crossentropy]
-model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics={'ecl_softmax': utils.range_categorical_accuracy})
+model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=model_params['lr']), metrics={'ecl_softmax': utils.range_categorical_accuracy})
 model.fit(train_data, epochs=150, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
 print (logname)
