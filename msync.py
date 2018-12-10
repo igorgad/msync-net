@@ -10,7 +10,7 @@ from MSYNC.Model import MSYNCModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 tf.set_random_seed(0)
 
-train_params = {'lr': 5.0e-5}
+train_params = {'lr': 1.0e-5}
 
 dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
