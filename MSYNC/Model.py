@@ -1,6 +1,6 @@
 
 import tensorflow as tf
-from MSYNC.vggish import vggish
+# from MSYNC.vggish import vggish
 
 
 class MSYNCModel:
@@ -13,12 +13,13 @@ class MSYNCModel:
         input = tf.keras.Input(shape=self.input_shape, name=name+'input')       
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
 
-        vggout = vggish(logmel, name=name)
-
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(vggout)
+        # vggout = vggish(logmel, name=name)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256), name=name + 'lstm_encoder/lstm1')(encoded)
+        
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(rate=self.dropout_rate), name=name + 'fc_block1/dropout')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
 
@@ -29,9 +30,9 @@ class MSYNCModel:
         v1_model = self.build_single_branch_model('v1')
         v2_model = self.build_single_branch_model('v2')
 
-        ecl_mat_distance = EclDistanceMat()([v1_model.output, v2_model.output])        
+        ecl_mat_distance = EclDistanceMat()([v1_model.output, v2_model.output])
         ecl_mean_distance = DiagMean()(ecl_mat_distance)        
-        ecl_softmax = tf.keras.layers.Softmax()(ecl_mean_distance)
+        ecl_softmax = tf.keras.layers.Softmax(name='ecl_softmax')(ecl_mean_distance)
 
         self.model = tf.keras.Model([v1_model.input, v2_model.input], ecl_softmax)
         return self.model
@@ -51,8 +52,8 @@ class LogMel(tf.keras.layers.Layer):
         output = tf.log(output + 0.01)
         output = tf.expand_dims(output, -1)
         output = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), output)
-
         tf.summary.image('mel_log', output)
+        output = tf.squeeze(output, -1)
         return output
 
     def build(self, input_shape):
@@ -69,7 +70,7 @@ class LogMel(tf.keras.layers.Layer):
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128, 1))
+        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128))
 
 
 class EclDistanceMat(tf.keras.layers.Layer):

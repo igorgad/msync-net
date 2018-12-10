@@ -10,7 +10,7 @@ from MSYNC.Model import MSYNCModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 tf.set_random_seed(26)
 
-train_params = {'lr': 6.2849e-5 }
+train_params = {'lr': 1.0e-5 }
 
 dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
@@ -18,14 +18,14 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 24,
+               'random_batch_size': 64,
                'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'no_ae-vgg-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'no_ae-lstm-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
@@ -51,5 +51,5 @@ msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data
 model = msync_model.build_model()
 model.summary()
 model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
-model.fit(train_data, epochs=70, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
+model.fit(train_data, epochs=150, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
 print (logname)
