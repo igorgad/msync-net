@@ -25,7 +25,7 @@ data_params = {'sample_rate': 16000,
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'all_finder-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
+logname = 'no_ae-vgg-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
 logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
 print (logname)
 
@@ -42,7 +42,7 @@ train_data, validation_data = dts.pipeline(data_params)
 # Set callbacks
 checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
-tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=0, batch_size=data_params['random_batch_size'], write_images=True)
+tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=4, batch_size=data_params['random_batch_size'], write_images=True)
 lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
 callbacks = [checkpoint, tensorboard, lr_reducer]
 
