@@ -46,6 +46,7 @@ class MSELayer(tf.keras.layers.Layer):
 
     def call(self, inputs, *args, **kwargs):
         yp, yt = inputs
+        tf.summary.image('decoded', tf.gather(yp, 0, axis=1))
         return tf.reduce_mean(tf.pow(yp - yt, 2), axis=[-2, -3, -4])
 
     def build(self, input_shape):
