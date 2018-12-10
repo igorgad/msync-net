@@ -9,35 +9,39 @@ class MSYNCModel:
         self.model = None
         self.dropout_rate = 0.25
 
-    def build_single_branch_model(self, name=''):
-        input = tf.keras.Input(shape=self.input_shape, name=name+'input')       
+    def build_encoder_model(self, input, name=''):
         logmel = tf.keras.layers.TimeDistributed(LogMel(), name=name+'logmel')(input)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(64, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm1')(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256, return_sequences=False), name=name+'lstm_encoder/lstm2')(encoded)
+        return encoded
 
-        # vggout = vggish(logmel, name=name)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(32, return_sequences=True), name=name+'lstm_encoder/lstm0')(logmel)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(64, return_sequences=True), name=name+'lstm_encoder/lstm1')(encoded)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(128, return_sequences=True), name=name+'lstm_encoder/lstm2')(encoded)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(256, return_sequences=False), name=name+'lstm_encoder/lstm3')(encoded)
-        
+    def build_top_model(self, encoded, name=''):
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(256), name=name + 'fc_block1/fc')(encoded)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block1/bn')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block1/elu')(output)
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.dropout_rate), name=name + 'fc_block1/dropout')(output)
+        # output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.dropout_rate), name=name + 'fc_block1/dropout')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block2/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block2/bn')(output)
-
-        model = tf.keras.Model(input, output, name=name)
-        return model
+        return output
 
     def build_model(self):
-        v1_model = self.build_single_branch_model('v1')
-        v2_model = self.build_single_branch_model('v2')
+        v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
+        v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
 
-        ecl_mat_distance = EclDistanceMat()([v1_model.output, v2_model.output])
+        v1_encoded = self.build_encoder_model(v1_input, 'v1')
+        v2_encoded = self.build_encoder_model(v2_input, 'v2')
+
+        v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
+
+        v1_top = self.build_top_model(v1_encoded, 'v1')
+        v2_top = self.build_top_model(v2_encoded, 'v2')
+
+        ecl_mat_distance = EclDistanceMat()([v1_top, v2_top])
         ecl_mean_distance = DiagMean()(ecl_mat_distance)        
         ecl_softmax = tf.keras.layers.Softmax(name='ecl_softmax')(ecl_mean_distance)
 
-        self.model = tf.keras.Model([v1_model.input, v2_model.input], ecl_softmax)
+        self.model = tf.keras.Model([v1_input, v2_input], ecl_softmax)
         return self.model
 
 
@@ -74,6 +78,28 @@ class LogMel(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128))
+
+
+class DMRNLayer(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        self.mel_matrix = None
+        super(DMRNLayer, self).__init__(**kwargs)
+
+    def fusion_function(self, x, y):
+        return x + (x + y) / 2
+
+    def call(self, inputs, *args, **kwargs):
+        x, y = inputs
+        x = self.fusion_function(x, y)
+        y = self.fusion_function(y, x)
+        return x, y
+
+    def build(self, input_shape):
+        super(DMRNLayer, self).build(input_shape)  # Be sure to call this at the end
+
+    def compute_output_shape(self, input_shape):
+        shape1, shape2 = input_shape
+        return tf.TensorShape(shape1), tf.TensorShape(shape2)
 
 
 class EclDistanceMat(tf.keras.layers.Layer):
