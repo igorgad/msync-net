@@ -11,6 +11,19 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 tf.set_random_seed(26)
 
 train_params = {'lr': 6.3e-5}
+mel_params = {'stft_window': 1600,
+              'stft_step': 160,
+              'num_mel_bins': 128,
+              'num_spectrogram_bins': 1025,
+              'sample_rate': 16000,
+              'lower_edge_hertz': 125.0,
+              'upper_edge_hertz': 7500.0
+              }
+
+model_params = {'lstm_units': [64, 128, 256],
+                'top_units': [256, 128],
+                'dropout': 0.25
+                }
 
 dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
@@ -25,8 +38,11 @@ data_params = {'sample_rate': 16000,
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }
 
-logname = 'dmrn-lstm/3lstm-2fc-norm-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
-logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
+logname = 'dmrn-lstm/' + dataset + '/'
+logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in train_params.items()]) + '/'
+logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()]) + '/'
+logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in mel_params.items()]) + '/'
+logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in model_params.items()])
 print (logname)
 
 # Get data pipelines
@@ -47,7 +63,7 @@ lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5
 callbacks = [checkpoint, tensorboard, lr_reducer]
 
 # Get Model
-msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
+msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), mel_params=mel_params, model_params=model_params)
 model = msync_model.build_model()
 model.summary()
 model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
