@@ -1,6 +1,5 @@
 
 import tensorflow as tf
-# from MSYNC.vggish import vggish
 
 
 class MSYNCModel:
@@ -10,9 +9,10 @@ class MSYNCModel:
         self.model_params = model_params
 
     def build_encoder_model(self, encoded, name=''):
-        for layer, units in enumerate(self.model_params['lstm_units'][:-1]):
-            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(self.model_params['lstm_units'][-1], return_sequences=False), name=name + 'lstm_encoder/lstmFinal')(encoded)
+        for layer, units in enumerate(self.model_params['conv_units']):
+            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(units, self.model_params['conv_kernels'][layer], padding='same'), name=name + 'vgg_block%d/conv' % layer)(encoded)
+            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'), name=name + 'vgg_block%d/pool' % layer)(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
         return encoded
 
     def build_top_model(self, encoded, name=''):
@@ -64,7 +64,6 @@ class LogMel(tf.keras.layers.Layer):
         output = tf.expand_dims(output, -1)
         output = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), output)
         tf.summary.image('mel_log', output)
-        output = tf.squeeze(output, -1)
         return output
 
     def build(self, input_shape):
@@ -81,29 +80,7 @@ class LogMel(tf.keras.layers.Layer):
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128))
-
-
-class DMRNLayer(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
-        self.mel_matrix = None
-        super(DMRNLayer, self).__init__(**kwargs)
-
-    def fusion_function(self, x, y):
-        return x + (x + y) / 2.0
-
-    def call(self, inputs, *args, **kwargs):
-        x, y = inputs
-        x = self.fusion_function(x, y)
-        y = self.fusion_function(y, x)
-        return x, y
-
-    def build(self, input_shape):
-        super(DMRNLayer, self).build(input_shape)  # Be sure to call this at the end
-
-    def compute_output_shape(self, input_shape):
-        shape1, shape2 = input_shape
-        return tf.TensorShape(shape1), tf.TensorShape(shape2)
+        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128, 1))
 
 
 class EclDistanceMat(tf.keras.layers.Layer):

@@ -18,7 +18,8 @@ model_params = {'lr': 6.3e-5,
                 'sample_rate': 16000,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
-                'lstm_units': [64, 128, 256],
+                'conv_units': [64, 128, 256],
+                'conv_kernels': [(3, 3), (3, 3), (3, 3)],
                 'top_units': [128, 8],
                 'dropout': 0.25,
                 'optimizer': 'adam'
@@ -30,7 +31,7 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 128,
+               'random_batch_size': 8,
                'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
@@ -38,7 +39,7 @@ data_params = {'sample_rate': 16000,
                }
 
 
-logname = 'no_ae-lstm/' + dataset + '/'
+logname = 'no_ae-vgg/' + dataset + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()]) + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in model_params.items()])
 print (logname)
