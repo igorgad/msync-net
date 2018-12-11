@@ -23,7 +23,7 @@ class MSYNCModel:
 
     def build_top(self, encoded, name=''):
         output = encoded
-        for layer, units in enumerate(self.model_params['top_units'][-1:]):
+        for layer, units in enumerate(self.model_params['top_units'][:-1]):
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block%d/fc' % layer)(encoded)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block%d/bn' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block%d/elu' % layer)(output)
