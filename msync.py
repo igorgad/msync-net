@@ -38,7 +38,7 @@ data_params = {'sample_rate': 16000,
                }
 
 
-logname = 'dmrn-lstm-run2/' + dataset + '/'
+logname = 'no_ae-lstm/' + dataset + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()]) + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in model_params.items()])
 print (logname)

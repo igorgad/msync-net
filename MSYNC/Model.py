@@ -37,8 +37,6 @@ class MSYNCModel:
         v1_encoded = self.build_encoder_model(v1_logmel, 'v1')
         v2_encoded = self.build_encoder_model(v2_logmel, 'v2')
 
-        v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
-
         v1_top = self.build_top_model(v1_encoded, 'v1')
         v2_top = self.build_top_model(v2_encoded, 'v2')
 
