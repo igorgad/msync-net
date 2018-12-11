@@ -4,13 +4,12 @@ import tensorflow as tf
 
 
 class MSYNCModel:
-    def __init__(self, input_shape, mel_params, model_params):
+    def __init__(self, input_shape, model_params):
         self.input_shape = input_shape
         self.model = None
         self.model_params = model_params
 
-    def build_encoder_model(self, input, name=''):
-        encoded = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name=name+'logmel')(input)
+    def build_encoder_model(self, encoded, name=''):
         for layer, units in enumerate(self.model_params['lstm_units'][:-1]):
             encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
         encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(self.model_params['lstm_units'][-1], return_sequences=False), name=name + 'lstm_encoder/lstmFinal')(encoded)
@@ -18,8 +17,8 @@ class MSYNCModel:
 
     def build_top_model(self, encoded, name=''):
         output = encoded
-        for layer, units in enumerate(self.model_params['top_units'][-1:]):
-            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128), name=name + 'fc_block%d/fc' % layer)(encoded)
+        for layer, units in enumerate(self.model_params['top_units'][:-1]):
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units), name=name + 'fc_block%d/fc' % layer)(encoded)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block%d/bn' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block%d/elu' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.model_params['dropout']), name=name + 'fc_block%d/dropout' % layer)(output)
@@ -31,9 +30,12 @@ class MSYNCModel:
     def build_model(self):
         v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
         v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
+        
+        v1_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v1logmel')(v1_input)
+        v2_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v2logmel')(v2_input)
 
-        v1_encoded = self.build_encoder_model(v1_input, 'v1')
-        v2_encoded = self.build_encoder_model(v2_input, 'v2')
+        v1_encoded = self.build_encoder_model(v1_logmel, 'v1')
+        v2_encoded = self.build_encoder_model(v2_logmel, 'v2')
 
         v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
 

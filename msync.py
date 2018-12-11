@@ -19,8 +19,9 @@ model_params = {'lr': 6.3e-5,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'lstm_units': [64, 128, 256],
-                'top_units': [256, 128],
-                'dropout': 0.25
+                'top_units': [128, 8],
+                'dropout': 0.25,
+                'optimizer': 'adam'
                 }
 
 dataset = 'medleydb'
@@ -29,7 +30,7 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 64,
+               'random_batch_size': 128,
                'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
@@ -37,9 +38,8 @@ data_params = {'sample_rate': 16000,
                }
 
 
-logname = 'dmrn-lstm/' + dataset + '/'
+logname = 'dmrn-lstm-run2/' + dataset + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()]) + '/'
-logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in mel_params.items()]) + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in model_params.items()])
 print (logname)
 
