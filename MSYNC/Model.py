@@ -45,8 +45,8 @@ class MSYNCModel:
         v1_decoded = self.build_decoder(v1_encoded, 'v1')
         v2_decoded = self.build_decoder(v2_encoded, 'v2')
 
-        v1_mse = MSELayer(name='v1ae')([v1_decoded, v1_logmel])
-        v2_mse = MSELayer(name='v2ae')([v2_decoded, v2_logmel])
+        v1_mse = MSELayer(name='v1ae')([v1_decoded, v2_logmel])
+        v2_mse = MSELayer(name='v2ae')([v2_decoded, v1_logmel])
 
         v1_top = self.build_top(v1_encoded, 'v1')
         v2_top = self.build_top(v2_encoded, 'v2')
