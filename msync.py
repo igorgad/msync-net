@@ -10,7 +10,7 @@ from MSYNC.Model import MSYNCModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 tf.set_random_seed(0)
 
-model_params = {'lr': 6.3e-5,
+model_params = {'lr': 1.0e-5,
                 'stft_window': 1600,
                 'stft_step': 160,
                 'num_mel_bins': 128,
@@ -20,7 +20,8 @@ model_params = {'lr': 6.3e-5,
                 'upper_edge_hertz': 7500.0,
                 'lstm_units': [128, 128, 128],
                 'top_units': [128, 8],
-                'dropout': 0.25
+                'dropout': 0.25,
+                'optimizer': 'adam'
                 }
 
 dataset = 'medleydb'
