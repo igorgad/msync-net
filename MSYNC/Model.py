@@ -9,21 +9,29 @@ class MSYNCModel:
         self.model = None
         self.model_params = model_params
 
-    def build_encoder_model(self, encoded, name=''):
-        for layer, units in enumerate(self.model_params['lstm_units'][:-1]):
+    def build_conv_encoder_model(self, encoded, name=''):
+        encoded = tf.keras.layers.Lambda(lambda enc: tf.expand_dims(enc, axis=-1), name=name+'expandLastDim')(encoded)
+        for layer, units in enumerate(self.model_params.encoder_units[:-1]):
+            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(units, (3, 3), padding='same'), name=name + 'vgg_block%d/conv' % layer)(encoded)
+            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'), name=name + 'vgg_block%d/pool' % layer)(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
+        return encoded
+
+    def build_lstm_encoder_model(self, encoded, name=''):
+        for layer, units in enumerate(self.model_params.encoder_units[:-1]):
             encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(self.model_params['lstm_units'][-1], return_sequences=False), name=name + 'lstm_encoder/lstmFinal')(encoded)
+        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(self.model_params.encoder_units[-1], return_sequences=False), name=name + 'lstm_encoder/lstmFinal')(encoded)
         return encoded
 
     def build_top_model(self, encoded, name=''):
         output = encoded
-        for layer, units in enumerate(self.model_params['top_units'][:-1]):
+        for layer, units in enumerate(self.model_params.top_units[:-1]):
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units), name=name + 'fc_block%d/fc' % layer)(encoded)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block%d/bn' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block%d/elu' % layer)(output)
-            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.model_params['dropout']), name=name + 'fc_block%d/dropout' % layer)(output)
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.model_params.dropout), name=name + 'fc_block%d/dropout' % layer)(output)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params['top_units'][-1]), name=name + 'fc_blockFinal/fc')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params.top_units[-1]), name=name + 'fc_blockFinal/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_blockFinal/bn')(output)
         return output
 
@@ -34,8 +42,16 @@ class MSYNCModel:
         v1_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v1logmel')(v1_input)
         v2_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v2logmel')(v2_input)
 
-        v1_encoded = self.build_encoder_model(v1_logmel, 'v1')
-        v2_encoded = self.build_encoder_model(v2_logmel, 'v2')
+        v1_encoded = v2_encoded = None
+        if self.model_params.encoder_arch == 'lstm':
+            v1_encoded = self.build_lstm_encoder_model(v1_logmel, 'v1')
+            v2_encoded = self.build_lstm_encoder_model(v2_logmel, 'v2')
+        elif self.model_params.encoder_arch == 'conv':
+            v1_encoded = self.build_conv_encoder_model(v1_logmel, 'v1')
+            v2_encoded = self.build_conv_encoder_model(v2_logmel, 'v2')
+        else:
+            print (self.model_params.encoder_arch + ' UNKNOW ARCHITECHTURE')
+            exit(0)
 
         v1_top = self.build_top_model(v1_encoded, 'v1')
         v2_top = self.build_top_model(v2_encoded, 'v2')
@@ -57,7 +73,7 @@ class LogMel(tf.keras.layers.Layer):
     def call(self, inputs, *args, **kwargs):
         inputs = tf.convert_to_tensor(inputs)
 
-        output = tf.abs(tf.contrib.signal.stft(inputs, self.params['stft_window'], self.params['stft_step'], pad_end=True))
+        output = tf.abs(tf.contrib.signal.stft(inputs, self.params.stft_window, self.params.stft_step, pad_end=True))
         output = tf.tensordot(output, self.mel_matrix, 1)
         output.set_shape(output.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
         output = tf.log(output + 0.01)
@@ -69,11 +85,11 @@ class LogMel(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
-            num_mel_bins=self.params['num_mel_bins'],
-            num_spectrogram_bins=self.params['num_spectrogram_bins'],
-            sample_rate=self.params['sample_rate'],
-            lower_edge_hertz=self.params['lower_edge_hertz'],
-            upper_edge_hertz=self.params['upper_edge_hertz'],
+            num_mel_bins=self.params.num_mel_bins,
+            num_spectrogram_bins=self.params.num_spectrogram_bins,
+            sample_rate=self.params.sample_rate,
+            lower_edge_hertz=self.params.lower_edge_hertz,
+            upper_edge_hertz=self.params.upper_edge_hertz,
             dtype=tf.float32,
             name=None
         )
@@ -81,7 +97,7 @@ class LogMel(tf.keras.layers.Layer):
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128))
+        return tf.TensorShape((input_shape[0], input_shape[1] // self.params.stft_step, self.params.num_mel_bins))
 
 
 class DMRNLayer(tf.keras.layers.Layer):

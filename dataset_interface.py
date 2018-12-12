@@ -30,12 +30,12 @@ def parse_features_and_decode(tf_example, features):
 
 
 def filter_instruments(parsed_features, data_params):
-    return tf.logical_and(tf.reduce_any(tf.equal(parsed_features['instruments'], data_params['instrument_1'])), tf.reduce_any(tf.equal(parsed_features['instruments'], data_params['instrument_2'])))
+    return tf.logical_and(tf.reduce_any(tf.equal(parsed_features['instruments'], data_params.instrument_1)), tf.reduce_any(tf.equal(parsed_features['instruments'], data_params.instrument_2)))
 
 
 def select_instruments(parsed_features, data_params):
-    i1_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_1']))[:, 0]
-    i2_index = tf.where(tf.equal(parsed_features['instruments'], data_params['instrument_2']))[:, 0]
+    i1_index = tf.where(tf.equal(parsed_features['instruments'], data_params.instrument_1))[:, 0]
+    i2_index = tf.where(tf.equal(parsed_features['instruments'], data_params.instrument_2))[:, 0]
     idx = tf.concat([i1_index, i2_index], axis=0)
 
     parsed_features['files'] = tf.map_fn(lambda i: tf.gather(parsed_features['files'], i, axis=0), idx, dtype=tf.string)
@@ -47,8 +47,8 @@ def select_instruments(parsed_features, data_params):
 
 def load_audio(parsed_features, data_params):
     def load_file(file):
-        audio_binary = tf.read_file(os.fsencode(data_params['audio_root']) + b'/' + parsed_features['folder'] + b'/' + file)
-        smp = tf.contrib.ffmpeg.decode_audio(audio_binary, file_format='wav', samples_per_second=data_params['sample_rate'], channel_count=1)
+        audio_binary = tf.read_file(os.fsencode(data_params.dataset_audio_dir) + b'/' + parsed_features['folder'] + b'/' + file)
+        smp = tf.contrib.ffmpeg.decode_audio(audio_binary, file_format='wav', samples_per_second=data_params.sample_rate, channel_count=1)
         return smp[:, 0]
 
     parsed_features['signals'] = tf.map_fn(load_file, parsed_features['files'], dtype=tf.float32, infer_shape=False)
@@ -60,7 +60,7 @@ def compute_activations(parsed_features, data_params):
         dtime = np.diff(labmat[0])
         lab = []
         for b in range(1, labmat.shape[0]):
-            lab.append(np.hstack([np.ones(int(dtime[i] / (1 / data_params['sample_rate'])), np.float32) * labmat[b, i] for i in range(dtime.size)]))
+            lab.append(np.hstack([np.ones(int(dtime[i] / (1 / data_params.sample_rate)), np.float32) * labmat[b, i] for i in range(dtime.size)]))
         return np.array(lab)
 
     parsed_features['activations'] = tf.cond(is_empty(parsed_features['activations']), lambda: tf.ones_like(parsed_features['signals']),
@@ -89,7 +89,7 @@ def copy_v0_to_vall(parsed_features):
 
 def scale_signals(parsed_features, data_params):
     def scale_signal(signal):
-        sig = 2 * data_params['scale_value'] * (signal - tf.reduce_min(signal)) / (tf.reduce_max(signal) - tf.reduce_min(signal)) - data_params['scale_value']
+        sig = 2 * data_params.scale_value * (signal - tf.reduce_min(signal)) / (tf.reduce_max(signal) - tf.reduce_min(signal)) - data_params.scale_value
         sig = sig - tf.reduce_mean(sig)
         return sig
 
@@ -98,7 +98,7 @@ def scale_signals(parsed_features, data_params):
 
 
 def generate_delay_values(parsed_features, data_params):
-    delay = tf.stack([1, (data_params['max_delay'] - tf.random_uniform([1], 0, 2 * data_params['max_delay'], dtype=tf.int32)[0])])
+    delay = tf.stack([1, (data_params.max_delay - tf.random_uniform([1], 0, 2 * data_params.max_delay, dtype=tf.int32)[0])])
     parsed_features['delay'] = delay
     return parsed_features
 
@@ -120,8 +120,8 @@ def add_random_delay(parsed_features, data_params):
 
 
 def frame_signals(parsed_features, data_params):
-    parsed_features['signals'] = tf.contrib.signal.frame(parsed_features['signals'], data_params['example_length'], data_params['example_length'], axis=1)
-    parsed_features['activations'] = tf.contrib.signal.frame(parsed_features['activations'], data_params['example_length'], data_params['example_length'], axis=1)
+    parsed_features['signals'] = tf.contrib.signal.frame(parsed_features['signals'], data_params.example_length, data_params.example_length, axis=1)
+    parsed_features['activations'] = tf.contrib.signal.frame(parsed_features['activations'], data_params.example_length, data_params.example_length, axis=1)
     return parsed_features
 
 
@@ -132,8 +132,8 @@ def unframe_signals(parsed_features, data_params):
 
 
 def limit_signal_size(parsed_features, data_params, secs=25):
-    parsed_features['signals'] = tf.gather(parsed_features['signals'], tf.range(tf.minimum(secs * data_params['sample_rate'], tf.shape(parsed_features['signals'])[-1])), axis=-1)
-    parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(secs * data_params['sample_rate'], tf.shape(parsed_features['signals'])[-1])), axis=-1)
+    parsed_features['signals'] = tf.gather(parsed_features['signals'], tf.range(tf.minimum(secs * data_params.sample_rate, tf.shape(parsed_features['signals'])[-1])), axis=-1)
+    parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(secs * data_params.sample_rate, tf.shape(parsed_features['signals'])[-1])), axis=-1)
     return parsed_features
 
 
@@ -145,13 +145,13 @@ def remove_non_active_frames(parsed_features, data_params, th=0.5):
 
 
 def filter_nwin_less_sequential_bach(parsed_features, data_params):
-    return tf.greater(tf.shape(parsed_features['signals'])[1], data_params['sequential_batch_size'])
+    return tf.greater(tf.shape(parsed_features['signals'])[1], data_params.sequential_batch_size)
 
 
 def random_select_samples(parsed_features, data_params):
     widx_max = tf.shape(parsed_features['signals'])[1]
-    widx_beg = tf.random_uniform([1], 0, widx_max - data_params['sequential_batch_size'], dtype=tf.int32)[0]
-    widx = tf.range(widx_beg, widx_beg + data_params['sequential_batch_size'])
+    widx_beg = tf.random_uniform([1], 0, widx_max - data_params.sequential_batch_size, dtype=tf.int32)[0]
+    widx = tf.range(widx_beg, widx_beg + data_params.sequential_batch_size)
     parsed_features['widx'] = widx
     return parsed_features
 
@@ -160,13 +160,13 @@ def sequential_batch(parsed_features, data_params):
     widx = parsed_features['widx']
     parsed_features['signals'] = tf.gather(parsed_features['signals'], widx, axis=1)
     parsed_features['activations'] = tf.gather(parsed_features['activations'], widx, axis=1)
-    parsed_features['signals'].set_shape([2, data_params['sequential_batch_size'], data_params['example_length']])
+    parsed_features['signals'].set_shape([2, data_params.sequential_batch_size, data_params.example_length])
     return parsed_features
 
 
 def compute_one_hot_delay(parsed_features, data_params):
-    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params['example_length']), tf.int32)
-    parsed_features['one_hot_delay'] = tf.one_hot(data_params['sequential_batch_size'] // 2 + int_delay, data_params['sequential_batch_size'] + 1)
+    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.example_length), tf.int32)
+    parsed_features['one_hot_delay'] = tf.one_hot(data_params.sequential_batch_size // 2 + int_delay, data_params.sequential_batch_size + 1)
     return parsed_features
 
 
@@ -178,7 +178,7 @@ def prepare_examples(parsed_features, data_params):
 
 
 def resample_train_test(parsed_features, data_params):
-    parsed_features['is_train'] = tf.less_equal(tf.random_uniform([1], 0, 100, dtype=tf.float32, seed=data_params['split_seed'])[0], data_params['split_rate'] * 100)
+    parsed_features['is_train'] = tf.less_equal(tf.random_uniform([1], 0, 100, dtype=tf.float32, seed=data_params.split_seed)[0], data_params.split_rate * 100)
     return parsed_features
 
 
@@ -191,14 +191,14 @@ def select_val_examples(parsed_features):
 
 
 def base_pipeline(data_params):
-    tfdataset = tf.data.TFRecordDataset(data_params['dataset_file'])
+    tfdataset = tf.data.TFRecordDataset(data_params.dataset_file)
     tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
     tfdataset = tfdataset.filter(lambda feat: filter_instruments(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: select_instruments(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: compute_activations(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: mix_similar_instruments(feat, data_params), num_parallel_calls=4)
-    if data_params['debug_auto']:
+    if data_params.debug_auto:
         tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
@@ -207,7 +207,7 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
-    tfdataset = tfdataset.cache().repeat().shuffle(data_params['shuffle_buffer'])
+    tfdataset = tfdataset.cache().repeat().shuffle(64)
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
@@ -223,6 +223,6 @@ def pipeline(data_params):
         train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
         val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
-        train_dataset = train_dataset.batch(data_params['random_batch_size']).prefetch(1)
-        val_dataset = val_dataset.batch(data_params['random_batch_size']).prefetch(1)
+        train_dataset = train_dataset.batch(data_params.random_batch_size).prefetch(1)
+        val_dataset = val_dataset.batch(data_params.random_batch_size).prefetch(1)
     return train_dataset, val_dataset
