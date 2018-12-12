@@ -19,9 +19,9 @@ model_params = {'lr': 6.3e-5,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'conv_units': [64, 128, 256],
-                'conv_kernels': [(3, 3), (3, 3), (3, 3)],
-                'top_units': [128, 8],
-                'dropout': 0.25,
+                'conv_kernels': [[3, 3], [3, 3], [3, 3]],
+                'top_units': [256, 128],
+                'dropout': 0.5,
                 'optimizer': 'adam'
                 }
 
@@ -30,10 +30,10 @@ dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
-               'example_length': 15360,  # almost 1 second of audio
+               'example_length': 4 * 15360,  # almost 1 second of audio
                'random_batch_size': 8,
                'sequential_batch_size': 8,
-               'max_delay': 4 * 15360,
+               'max_delay': 16 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar'
                }

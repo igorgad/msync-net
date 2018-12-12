@@ -10,7 +10,7 @@ class MSYNCModel:
 
     def build_encoder_model(self, encoded, name=''):
         for layer, units in enumerate(self.model_params['conv_units']):
-            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(units, self.model_params['conv_kernels'][layer], padding='same'), name=name + 'vgg_block%d/conv' % layer)(encoded)
+            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(units, self.model_params['conv_kernels'][layer], padding='same', activation='elu'), name=name + 'vgg_block%d/conv' % layer)(encoded)
             encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'), name=name + 'vgg_block%d/pool' % layer)(encoded)
         encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
         return encoded

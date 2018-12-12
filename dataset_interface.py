@@ -131,7 +131,7 @@ def unframe_signals(parsed_features, data_params):
     return parsed_features
 
 
-def limit_signal_size(parsed_features, data_params, secs=25):
+def limit_signal_size(parsed_features, data_params, secs=100):
     parsed_features['signals'] = tf.gather(parsed_features['signals'], tf.range(tf.minimum(secs * data_params['sample_rate'], tf.shape(parsed_features['signals'])[-1])), axis=-1)
     parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(secs * data_params['sample_rate'], tf.shape(parsed_features['signals'])[-1])), axis=-1)
     return parsed_features
@@ -205,12 +205,14 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
+#     tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.cache().repeat().shuffle(data_params['shuffle_buffer'])
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: random_select_samples(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
