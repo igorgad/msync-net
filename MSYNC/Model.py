@@ -84,28 +84,6 @@ class LogMel(tf.keras.layers.Layer):
         return tf.TensorShape((input_shape[0], input_shape[1] // 160, 128))
 
 
-class DMRNLayer(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
-        self.mel_matrix = None
-        super(DMRNLayer, self).__init__(**kwargs)
-
-    def fusion_function(self, x, y):
-        return x + (x + y) / 2.0
-
-    def call(self, inputs, *args, **kwargs):
-        x, y = inputs
-        x = self.fusion_function(x, y)
-        y = self.fusion_function(y, x)
-        return x, y
-
-    def build(self, input_shape):
-        super(DMRNLayer, self).build(input_shape)  # Be sure to call this at the end
-
-    def compute_output_shape(self, input_shape):
-        shape1, shape2 = input_shape
-        return tf.TensorShape(shape1), tf.TensorShape(shape2)
-
-
 class EclDistanceMat(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         self.mel_matrix = None

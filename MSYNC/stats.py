@@ -33,8 +33,8 @@ class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
         tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('diag_mean').output, model.targets[0]))
         tf.summary.image('input_plots', create_inputs_plot(model.inputs[0], model.inputs[1]))
 
-        i1_audio = tf.expand_dims(tf.reshape(model.inputs[0], [-1, 8 * 15360]), axis=-1)
-        i2_audio = tf.expand_dims(tf.reshape(model.inputs[1], [-1, 8 * 15360]), axis=-1)
+        i1_audio = tf.expand_dims(tf.reshape(model.inputs[0], [tf.shape(model.inputs[0])[0], -1]), axis=-1)
+        i2_audio = tf.expand_dims(tf.reshape(model.inputs[1], [tf.shape(model.inputs[1])[0], -1]), axis=-1)
         tf.summary.audio('input1_audio', i1_audio, 16000)
         tf.summary.audio('input2_audio', i2_audio, 16000)
         tf.summary.audio('mixed_audio', tf.reduce_mean(tf.concat([i1_audio, i2_audio], axis=-1), axis=-1), 16000)
