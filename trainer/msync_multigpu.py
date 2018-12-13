@@ -35,7 +35,8 @@ model_params = {'stft_window': 1600,
                 'encoder_arch': 'lstm',
                 'encoder_units': [64, 128, 256],
                 'top_units': [128, 8],
-                'dropout': 0.25
+                'dropout': 0.25,
+                'dmrn': False
                 }
 
 train_params = {'lr': 6.3e-5,

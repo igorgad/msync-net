@@ -53,6 +53,9 @@ class MSYNCModel:
             print (self.model_params.encoder_arch + ' UNKNOW ARCHITECHTURE')
             exit(0)
 
+        if self.model_params.dmrn:
+            v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
+
         v1_top = self.build_top_model(v1_encoded, 'v1')
         v2_top = self.build_top_model(v2_encoded, 'v2')
 
