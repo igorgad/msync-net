@@ -53,7 +53,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'no_ae/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '_').replace(' ', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '_').replace(' ', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 # Set callbacks
 checkpoint = tf.keras.callbacks.ModelCheckpoint(params.logdir + '/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)

@@ -1,59 +1,74 @@
 
 import os
 import tensorflow as tf
-import numpy as np
-import dataset_interface as dts
-import MSYNC.utils as utils
-import MSYNC.stats as stats
-from MSYNC.Model import MSYNCModel
+import argparse
+import trainer.dataset_interface as dataset_interface
+import trainer.utils as utils
+import trainer.stats as stats
+from trainer.Model import MSYNCModel
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+tf.set_random_seed(26)
 
-train_params = {'lr': 1e-4,
-                'drop_lr': 0.1,
-                'drop_epoch': 5,
-                'pretrain': False
-                }
-
-dataset = 'bach10'
+dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 64,
+               'random_batch_size': 128,
                'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
-               'split_seed': 2,
+               'split_seed': 3,
                'split_rate': 0.8,
-               'debug_auto': False
+               'debug_auto': False,
+               'scale_value': 1.0
                }
 
-logname = 'master-' + dataset + ''.join(['-%s=%s' % (key, value) for (key, value) in train_params.items()])
-logname = logname + ''.join(['-%s=%s' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()])
-print (logname)
+model_params = {'stft_window': 1600,
+                'stft_step': 160,
+                'num_mel_bins': 128,
+                'num_spectrogram_bins': 1025,
+                'lower_edge_hertz': 125.0,
+                'upper_edge_hertz': 7500.0,
+                'encoder_arch': 'lstm',
+                'encoder_units': [64, 128, 256],
+                'top_units': [128, 8],
+                'dropout': 0.25
+                }
 
-# Get data pipelines
-data_params['scale_value'] = 1.0
-data_params['shuffle_buffer'] = 32
-data_params['dataset_file'] = dataset_file
-data_params['audio_root'] = dataset_audio_root
-train_data, validation_data = dts.pipeline(data_params)
+train_params = {'lr': 6.3e-5,
+                'epochs': 150,
+                'steps_per_epoch': 25,
+                'val_steps': 25,
+                'num_gpus': 1
+                }
 
-# Set Callbacks
-checkpoint = tf.keras.callbacks.ModelCheckpoint('./logs/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
+parser = argparse.ArgumentParser(description='Launch training session of msync-net.')
+parser.add_argument('--logdir', type=str, default='./logs/', help='The directory to store the experiments logs (default: ./logs/)')
+parser.add_argument('--dataset_file', type=str, default=dataset_file, help='Dataset file in tfrecord format (default: %s)' % str(dataset_file))
+parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root, help='Directory to fetch wav files (default: %s)' % str(dataset_audio_root))
+[parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in train_params.items()]
+[parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in model_params.items()]
+[parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
+
+params = parser.parse_known_args()[0]
+logname = 'master-multigpu/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '_').replace(' ', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+
+# Set callbacks
+checkpoint = tf.keras.callbacks.ModelCheckpoint(params.logdir + '/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
-tensorboard = stats.TensorBoardAVE(log_dir='./logs/%s' % logname, histogram_freq=4, batch_size=data_params['random_batch_size'], write_images=True)
-lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lambda epoch: train_params['lr'] * np.power(train_params['drop_lr'], np.floor((1 + epoch) / train_params['drop_epoch'])))
-callbacks = [checkpoint, tensorboard, lr_scheduler, early_stop]
+tensorboard = stats.TensorBoardAVE(log_dir=params.logdir + '/%s' % logname, histogram_freq=4, batch_size=params.random_batch_size, write_images=True)
+lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+callbacks = [checkpoint, tensorboard, lr_reducer]
 
-# Get Model on CPU
-msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']))
+# Build Data Pipeline and Model
+train_data, validation_data = dataset_interface.pipeline(params)
+msync_model = MSYNCModel(input_shape=(data_params['sequential_batch_size'], data_params['example_length']), model_params=params)
 model = msync_model.build_model()
 model.summary()
 
-parallel_model = tf.keras.utils.multi_gpu_model(model, gpus=4, cpu_merge=False)
+parallel_model = tf.keras.utils.multi_gpu_model(model, gpus=params.num_gpus, cpu_merge=False)
 parallel_model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=train_params['lr']), metrics=['accuracy', utils.range_categorical_accuracy])
-parallel_model.fit(train_data, epochs=400, steps_per_epoch=25, validation_data=validation_data, validation_steps=25, callbacks=callbacks)
+parallel_model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks)
