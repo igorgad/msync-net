@@ -24,13 +24,13 @@ model_params = {'lr': 6.3e-5,
                 'optimizer': 'adam'
                 }
 
-dataset = 'medleydb_v2'
-dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB_v2.tfrecord'
+dataset = 'medleydb'
+dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,  # almost 1 second of audio
-               'random_batch_size': 16,
+               'random_batch_size': 32,
                'sequential_batch_size': 8,
                'max_delay': 16 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
@@ -38,7 +38,7 @@ data_params = {'sample_rate': 16000,
                }
 
 
-logname = 'no_ae-lstm/' + dataset + '/'
+logname = 'no_ae-lstm-v1/' + dataset + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '_')) for (key, value) in data_params.items()]) + '/'
 logname = logname + ''.join(['%s=%s-' % (key, str(value).replace(' ', '')) for (key, value) in model_params.items()])
 print (logname)

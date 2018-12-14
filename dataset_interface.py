@@ -205,9 +205,9 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
-#     tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
-    tfdataset = tfdataset.cache().repeat().shuffle(data_params['shuffle_buffer'])
+    tfdataset = tfdataset.cache()
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
@@ -225,6 +225,6 @@ def pipeline(data_params):
         train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
         val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
-        train_dataset = train_dataset.batch(data_params['random_batch_size']).prefetch(1)
-        val_dataset = val_dataset.batch(data_params['random_batch_size']).prefetch(1)
+        train_dataset = train_dataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size']).prefetch(32)
+        val_dataset = val_dataset.repeat().shuffle(data_params['shuffle_buffer']).batch(data_params['random_batch_size']).prefetch(32)
     return train_dataset, val_dataset
