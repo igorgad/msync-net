@@ -13,17 +13,18 @@ dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
-               'example_length': 15360,  # almost 1 second of audio
+               'example_length': 4 * 15360,  # almost 1 second of audio
                'random_batch_size': 128,
-               'sequential_batch_size': 8,
-               'max_delay': 4 * 15360,
+               'max_delay': 2 * 15360,
+               'labels_precision': 15360 // 2,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 3,
                'split_rate': 0.8,
-               'debug_auto': True,
+               'debug_auto': False,
                'scale_value': 1.0,
-               'limit_size_seconds': 25
+               'limit_size_seconds': 25,
+               'stft_step': 160
                }
 
 data_params['dataset_file'] = dataset_file

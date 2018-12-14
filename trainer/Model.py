@@ -11,16 +11,14 @@ class MSYNCModel:
 
     def build_conv_encoder_model(self, encoded, name=''):
         encoded = tf.keras.layers.Lambda(lambda enc: tf.expand_dims(enc, axis=-1), name=name+'expandLastDim')(encoded)
-        for layer, units in enumerate(self.model_params.encoder_units[:-1]):
-            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv2D(units, (3, 3), padding='same'), name=name + 'vgg_block%d/conv' % layer)(encoded)
-            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same'), name=name + 'vgg_block%d/pool' % layer)(encoded)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.GlobalAveragePooling2D(), name=name + 'GAverage')(encoded)
+        for layer, units in enumerate(self.model_params.encoder_units):
+            encoded = tf.keras.layers.Conv2D(units, (3, 3), activation='elu', padding='same', name=name + 'vgg_block%d/conv' % layer)(encoded)
+            encoded = tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same', name=name + 'vgg_block%d/pool' % layer)(encoded)
         return encoded
 
     def build_lstm_encoder_model(self, encoded, name=''):
-        for layer, units in enumerate(self.model_params.encoder_units[:-1]):
-            encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
-        encoded = tf.keras.layers.TimeDistributed(tf.keras.layers.CuDNNLSTM(self.model_params.encoder_units[-1], return_sequences=False), name=name + 'lstm_encoder/lstmFinal')(encoded)
+        for layer, units in enumerate(self.model_params.encoder_units):
+            encoded = tf.keras.layers.CuDNNLSTM(units, return_sequences=True, name=name+'lstm_encoder/lstm'+str(layer))(encoded)
         return encoded
 
     def build_top_model(self, encoded, name=''):
@@ -39,8 +37,8 @@ class MSYNCModel:
         v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
         v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
         
-        v1_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v1logmel')(v1_input)
-        v2_logmel = tf.keras.layers.TimeDistributed(LogMel(params=self.model_params), name='v2logmel')(v2_input)
+        v1_logmel = LogMel(params=self.model_params, name='v1logmel')(v1_input)
+        v2_logmel = LogMel(params=self.model_params, name='v2logmel')(v2_input)
 
         v1_encoded = v2_encoded = None
         if self.model_params.encoder_arch == 'lstm':
@@ -56,10 +54,11 @@ class MSYNCModel:
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
 
-        v1_top = self.build_top_model(v1_encoded, 'v1')
-        v2_top = self.build_top_model(v2_encoded, 'v2')
+        if self.model_params.top_units:
+            v1_encoded = self.build_top_model(v1_encoded, 'v1')
+            v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
-        ecl_mat_distance = EclDistanceMat()([v1_top, v2_top])
+        ecl_mat_distance = EclDistanceMat()([v1_encoded, v2_encoded])
         ecl_mean_distance = DiagMean()(ecl_mat_distance)        
         ecl_softmax = tf.keras.layers.Softmax(name='ecl_softmax')(ecl_mean_distance)
 

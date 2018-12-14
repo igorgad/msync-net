@@ -146,28 +146,24 @@ def remove_non_active_frames(parsed_features, data_params, th=0.5):
 
 
 def filter_nwin_less_sequential_bach(parsed_features, data_params):
-    return tf.greater(tf.shape(parsed_features['signals'])[1], data_params.sequential_batch_size)
+    return tf.greater(tf.shape(parsed_features['signals'])[1], 1)
 
 
-def random_select_samples(parsed_features, data_params):
+def random_select_frame(parsed_features, data_params):
     widx_max = tf.shape(parsed_features['signals'])[1]
-    widx_beg = tf.random_uniform([1], 0, widx_max - data_params.sequential_batch_size, dtype=tf.int32)[0]
-    widx = tf.range(widx_beg, widx_beg + data_params.sequential_batch_size)
-    parsed_features['widx'] = widx
-    return parsed_features
+    widx = tf.random_uniform([1], 0, widx_max, dtype=tf.int32)[0]
 
-
-def sequential_batch(parsed_features, data_params):
-    widx = parsed_features['widx']
     parsed_features['signals'] = tf.gather(parsed_features['signals'], widx, axis=1)
     parsed_features['activations'] = tf.gather(parsed_features['activations'], widx, axis=1)
-    parsed_features['signals'].set_shape([2, data_params.sequential_batch_size, data_params.example_length])
+    parsed_features['signals'].set_shape([2, data_params.example_length])
     return parsed_features
 
 
 def compute_one_hot_delay(parsed_features, data_params):
-    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.example_length), tf.int32)
-    parsed_features['one_hot_delay'] = tf.one_hot(data_params.sequential_batch_size // 2 + int_delay, data_params.sequential_batch_size + 1)
+    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
+    middle_class = int_delay + data_params.example_length // 2 // data_params.stft_step
+    range_class = tf.range(middle_class - data_params.labels_precision // data_params.stft_step, middle_class + data_params.labels_precision // data_params.stft_step)
+    parsed_features['one_hot_delay'] = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
     return parsed_features
 
 
@@ -209,13 +205,10 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.cache()
-    tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
+    tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
-    tfdataset = tfdataset.map(lambda feat: random_select_samples(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
-    tfdataset = tfdataset.map(lambda feat: sequential_batch(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: random_select_frame(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
     return tfdataset
 

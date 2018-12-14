@@ -14,10 +14,10 @@ dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
-               'example_length': 15360,  # almost 1 second of audio
+               'example_length': 2 * 15360,
+               'max_delay': 1 * 15360,
+               'labels_precision': 15360 // 2,
                'random_batch_size': 32,
-               'sequential_batch_size': 8,
-               'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 3,
@@ -55,7 +55,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '_').replace(' ', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master-no-td/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '_').replace(' ', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 # Set callbacks
 checkpoint = tf.keras.callbacks.ModelCheckpoint(params.logdir + '/%s/model-checkpoint.hdf5' % logname, monitor='val_loss', period=1, save_best_only=True)
@@ -66,7 +66,7 @@ callbacks = [checkpoint, tensorboard, lr_reducer]
 
 # Build Data Pipeline and Model
 train_data, validation_data = dataset_interface.pipeline(params)
-msync_model = MSYNCModel(input_shape=(params.sequential_batch_size, params.example_length), model_params=params)
+msync_model = MSYNCModel(input_shape=(params.example_length,), model_params=params)
 model = msync_model.build_model()
 model.summary()
 
