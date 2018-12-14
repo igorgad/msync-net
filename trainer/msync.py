@@ -10,12 +10,12 @@ from trainer.Model import MSYNCModel
 tf.set_random_seed(26)
 
 dataset = 'medleydb'
-dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB.tfrecord'
+dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB_v2.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
                'example_length': 15360,  # almost 1 second of audio
-               'random_batch_size': 128,
+               'random_batch_size': 32,
                'sequential_batch_size': 8,
                'max_delay': 4 * 15360,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
@@ -23,7 +23,8 @@ data_params = {'sample_rate': 16000,
                'split_seed': 3,
                'split_rate': 0.8,
                'debug_auto': False,
-               'scale_value': 1.0
+               'scale_value': 1.0,
+               'limit_size_seconds': 25
                }
 
 model_params = {'stft_window': 1600,
@@ -33,9 +34,9 @@ model_params = {'stft_window': 1600,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'encoder_arch': 'lstm',
-                'encoder_units': [64, 128, 256],
-                'top_units': [128, 8],
-                'dropout': 0.25,
+                'encoder_units': [128, 256, 512],
+                'top_units': [256, 128],
+                'dropout': 0.5,
                 'dmrn': False
                 }
 

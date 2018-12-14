@@ -131,7 +131,8 @@ def unframe_signals(parsed_features, data_params):
     return parsed_features
 
 
-def limit_signal_size(parsed_features, data_params, secs=25):
+def limit_signal_size(parsed_features, data_params):
+    secs = data_params.limit_size_seconds
     parsed_features['signals'] = tf.gather(parsed_features['signals'], tf.range(tf.minimum(secs * data_params.sample_rate, tf.shape(parsed_features['signals'])[-1])), axis=-1)
     parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(secs * data_params.sample_rate, tf.shape(parsed_features['signals'])[-1])), axis=-1)
     return parsed_features
@@ -207,7 +208,7 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
-    tfdataset = tfdataset.cache().repeat().shuffle(64)
+    tfdataset = tfdataset.cache()
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1) # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
@@ -225,6 +226,6 @@ def pipeline(data_params):
         train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
         val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
-        train_dataset = train_dataset.batch(data_params.random_batch_size).prefetch(1)
-        val_dataset = val_dataset.batch(data_params.random_batch_size).prefetch(1)
+        train_dataset = train_dataset.repeat().shuffle(64).batch(data_params.random_batch_size).prefetch(1)
+        val_dataset = val_dataset.repeat().shuffle(64).batch(data_params.random_batch_size).prefetch(1)
     return train_dataset, val_dataset
