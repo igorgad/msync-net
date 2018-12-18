@@ -9,7 +9,7 @@ from trainer.Model import MSYNCModel
 
 tf.set_random_seed(26)
 
-dataset = 'medleydb'
+dataset = 'bach10'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB_v2.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
@@ -34,13 +34,13 @@ model_params = {'stft_window': 1600,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'encoder_arch': 'lstm',
-                'encoder_units': [128, 256, 512],
-                'top_units': [256, 128],
+                'encoder_units': [128],
+                'top_units': [64],
                 'dropout': 0.5,
                 'dmrn': False
                 }
 
-train_params = {'lr': 6.3e-5,
+train_params = {'lr': 1.0e-4,
                 'epochs': 150,
                 'steps_per_epoch': 25,
                 'val_steps': 25
@@ -70,6 +70,6 @@ msync_model = MSYNCModel(input_shape=(params.example_length,), model_params=para
 model = msync_model.build_model()
 model.summary()
 
-model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=['accuracy', utils.range_categorical_accuracy])
+model.compile(loss=tf.keras.losses.binary_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=[utils.range_categorical_accuracy])
 model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks)
 print (logname)

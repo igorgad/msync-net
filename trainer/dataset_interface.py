@@ -163,7 +163,9 @@ def compute_one_hot_delay(parsed_features, data_params):
     int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
     middle_class = int_delay + data_params.example_length // 2 // data_params.stft_step
     range_class = tf.range(middle_class - data_params.labels_precision // data_params.stft_step, middle_class + data_params.labels_precision // data_params.stft_step)
-    parsed_features['one_hot_delay'] = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
+    one_hot_label = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
+    # one_hot_label = tf.nn.softmax(one_hot_label)
+    parsed_features['one_hot_delay'] = one_hot_label
     return parsed_features
 
 

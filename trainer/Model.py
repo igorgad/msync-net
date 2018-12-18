@@ -48,7 +48,7 @@ class MSYNCModel:
             v1_encoded = self.build_conv_encoder_model(v1_logmel, 'v1')
             v2_encoded = self.build_conv_encoder_model(v2_logmel, 'v2')
         else:
-            print (self.model_params.encoder_arch + ' UNKNOW ARCHITECHTURE')
+            print (self.model_params.encoder_arch + ' UNKNOW ENCODER')
             exit(0)
 
         if self.model_params.dmrn:
@@ -58,11 +58,11 @@ class MSYNCModel:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
-        ecl_mat_distance = EclDistanceMat()([v1_encoded, v2_encoded])
-        ecl_mean_distance = DiagMean()(ecl_mat_distance)        
-        ecl_softmax = tf.keras.layers.Softmax(name='ecl_softmax')(ecl_mean_distance)
+        ecl = EclDistanceMat()([v1_encoded, v2_encoded])
+        ecl = DiagMean()(ecl)
+        ecl = tf.keras.layers.Softmax(name='ecl_softmax')(ecl)
 
-        self.model = tf.keras.Model([v1_input, v2_input], ecl_softmax)
+        self.model = tf.keras.Model([v1_input, v2_input], ecl)
         return self.model
 
 
