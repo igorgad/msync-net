@@ -6,10 +6,17 @@ import tfmpl
 
 @tfmpl.figure_tensor
 def create_ave_image(ecl_distance, targets):
+
+    ecl_curve = ecl_distance[0,:]
+    target_curve = targets[0, :]
+
+    ecl_curve = (ecl_curve - np.min(ecl_curve)) / (np.max(ecl_curve) - np.min(ecl_curve))
+    target_curve = (target_curve - np.min(target_curve)) / (np.max(target_curve) - np.min(target_curve))
+
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)
-    ax.plot(np.arange(-ecl_distance.shape[1] //2 + 1, ecl_distance.shape[1] // 2 + 1), ecl_distance[0,:])
-    ax.plot(np.arange(-ecl_distance.shape[1] // 2 + 1, ecl_distance.shape[1] // 2 + 1), targets[0, :])
+    ax.plot(np.arange(-ecl_distance.shape[1] //2 + 1, ecl_distance.shape[1] // 2 + 1), ecl_curve)
+    ax.plot(np.arange(-ecl_distance.shape[1] // 2 + 1, ecl_distance.shape[1] // 2 + 1), target_curve)
     # ax.axvline(np.argmax(targets[0, :]) - targets[0, :].size // 2)
     # ax.axvline(np.argmax(targets[0, :]) - targets[0, :].size // 2)
     return fig

@@ -12,6 +12,6 @@ def contrastive_loss(y_true, y_pred):
 
 def range_categorical_accuracy(y_true, y_pred):
     max_dist_index_pred = tf.cast(tf.one_hot(tf.argmax(y_pred, axis=-1), tf.shape(y_pred)[-1]), tf.bool)
-    max_dist_index_true = tf.greater(y_true, 0.0)
+    max_dist_index_true = tf.greater(y_true, tf.reduce_min(y_true, axis=-1, keepdims=True))
     range_acc = tf.reduce_any(tf.logical_and(max_dist_index_pred, max_dist_index_true), axis=1)
     return tf.cast(range_acc, tf.float32)

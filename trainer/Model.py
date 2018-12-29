@@ -17,8 +17,9 @@ class MSYNCModel:
         return encoded
 
     def build_lstm_encoder_model(self, encoded, name=''):
+        lstm_cell = tf.keras.layers.CuDNNLSTM if self.model_params.culstm else tf.keras.layers.LSTM
         for layer, units in enumerate(self.model_params.encoder_units):
-            encoded = tf.keras.layers.CuDNNLSTM(units, return_sequences=True, name=name+'lstm_encoder/lstm'+str(layer))(encoded)
+            encoded = tf.keras.layers.Bidirectional(lstm_cell(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
         return encoded
 
     def build_top_model(self, encoded, name=''):

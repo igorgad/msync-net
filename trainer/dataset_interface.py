@@ -2,6 +2,9 @@
 import tensorflow as tf
 import numpy as np
 import os
+import soundfile as sf
+import librosa
+import io
 
 
 features = {
@@ -47,9 +50,21 @@ def select_instruments(parsed_features, data_params):
 
 def load_audio(parsed_features, data_params):
     def load_file(file):
-        audio_binary = tf.read_file(os.fsencode(data_params.dataset_audio_dir) + b'/' + parsed_features['folder'] + b'/' + file)
-        smp = tf.contrib.ffmpeg.decode_audio(audio_binary, file_format='wav', samples_per_second=data_params.sample_rate, channel_count=1)
-        return smp[:, 0]
+        filename = os.fsencode(data_params.dataset_audio_dir) + b'/' + parsed_features['folder'] + b'/' + file
+        if data_params.from_bucket:
+            audio_binary = tf.py_func(lambda path: tf.gfile.Open(path, 'rb').read(), [filename], [tf.string])[0]
+        else:
+            audio_binary = tf.read_file(filename)
+
+        def decode_binary(binary):
+            info = sf.info(io.BytesIO(binary))
+            data, sr = sf.read(io.BytesIO(binary), dtype=np.float32, frames=data_params.limit_size_seconds * info.samplerate)
+            data = data.T
+            data = librosa.to_mono(data)
+            return librosa.resample(data, sr, data_params.sample_rate, res_type='kaiser_fast')
+
+        smp = tf.py_func(decode_binary, [audio_binary], [tf.float32])[0]
+        return smp
 
     parsed_features['signals'] = tf.map_fn(load_file, parsed_features['files'], dtype=tf.float32, infer_shape=False)
     return parsed_features
@@ -163,9 +178,9 @@ def compute_one_hot_delay(parsed_features, data_params):
     int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
     middle_class = int_delay + data_params.example_length // 2 // data_params.stft_step
     range_class = tf.range(middle_class - data_params.labels_precision // data_params.stft_step, middle_class + data_params.labels_precision // data_params.stft_step)
-    one_hot_label = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
-    # one_hot_label = tf.nn.softmax(one_hot_label)
-    parsed_features['one_hot_delay'] = one_hot_label
+    label = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
+    label = tf.nn.softmax(label)
+    parsed_features['one_hot_delay'] = label
     return parsed_features
 
 
@@ -189,7 +204,7 @@ def select_val_examples(parsed_features):
     return tf.logical_not(parsed_features['is_train'])
 
 
-def base_pipeline(data_params):
+def cached_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params.dataset_file)
     tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
     tfdataset = tfdataset.filter(lambda feat: filter_instruments(feat, data_params))
@@ -204,9 +219,15 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
+    # tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.cache()
+    return tfdataset
+
+def base_pipeline(data_params):
+    tfdataset = cached_pipeline(data_params)
+    # tfdataset = tfdataset.repeat().shuffle(64)
+
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
