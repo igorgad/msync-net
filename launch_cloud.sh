@@ -3,9 +3,9 @@
 DATASET_FILE=gs://msync-bucket/datasets/MedleyDB/MSYNC-MedleyDB_v2.tfrecord
 DATASET_AUDIO_DIR=gs://msync-bucket/datasets/MedleyDB/Audio
 LOG_DIR=gs://msync-bucket/logs/MSYNC
-EPOCHS=50
+EPOCHS=80
 
-JOB_NAME=notd_test21
+JOB_NAME=notd_test33
 
 gcloud ml-engine jobs submit training $JOB_NAME \
                                     --stream-logs \
