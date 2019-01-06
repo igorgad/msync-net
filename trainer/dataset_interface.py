@@ -242,6 +242,6 @@ def pipeline(data_params):
         train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
         val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
-        train_dataset = train_dataset.repeat().shuffle(64).batch(data_params.random_batch_size).prefetch(1)
-        val_dataset = val_dataset.repeat().shuffle(64).batch(data_params.random_batch_size).prefetch(1)
+        train_dataset = train_dataset.repeat().shuffle(16).batch(data_params.random_batch_size).prefetch(1)
+        val_dataset = val_dataset.repeat().shuffle(16).batch(data_params.random_batch_size).prefetch(1)
     return train_dataset, val_dataset
