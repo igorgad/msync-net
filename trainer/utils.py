@@ -33,7 +33,7 @@ def topn_range_categorical_accuracy(y_true, y_pred, n=1):
     lead = tf.reverse(lead, axis=[-1])
     tops = tf.math.top_k(lead, n)
     max_dist_index_pred = tf.map_fn(lambda i: tf.cast(tf.reduce_sum(tf.one_hot(i, tf.shape(y_pred)[-1]), axis=0), tf.bool), tops.indices, dtype=tf.bool)
-    max_dist_index_true = tf.greater(y_true, tf.reduce_min(y_true))
+    max_dist_index_true = tf.map_fn(lambda y: tf.greater(y, tf.reduce_min(y, axis=-1) + 0.2 * tf.reduce_max(y, axis=-1)), y_true, dtype=tf.bool)
     range_acc = tf.reduce_any(tf.logical_and(max_dist_index_pred, max_dist_index_true), axis=1)
     return tf.reduce_mean(tf.cast(range_acc, tf.float32))
 

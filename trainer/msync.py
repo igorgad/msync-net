@@ -23,7 +23,7 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
                'max_delay': 2 * 15360,
-               'labels_precision': 15360 // 4,
+               'labels_precision': 15360 // 1,
                'random_batch_size': 16,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
@@ -37,8 +37,8 @@ data_params = {'sample_rate': 16000,
 
 model_params = {'stft_window': 3200,
                 'stft_step': 160,
-                'num_mel_bins': 128,
-                'num_spectrogram_bins': 2049,
+                'num_mel_bins': 256,
+                'num_spectrogram_bins':2049,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'encoder_arch': 'lstm',
@@ -50,7 +50,7 @@ model_params = {'stft_window': 3200,
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 40,
+                'epochs': 60,
                 'steps_per_epoch': 25,
                 'val_steps': 25
                 }
@@ -64,7 +64,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master-notd-topnracc/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master-lstm/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if not params.logdir.startswith('gs://'):
     logname = os.path.join(params.logdir, logname)
