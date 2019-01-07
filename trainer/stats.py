@@ -37,7 +37,7 @@ class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
 
     def _make_histogram_ops(self, model):
 #         super(TensorBoardAVE, self)._make_histogram_ops(model)
-        tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('ecl_softmax').output, model.targets[0]))
+        tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('ecl_output').output, model.targets[0]))
         # tf.summary.image('input_plots', create_inputs_plot(model.inputs[0], model.inputs[1]))
 
         i1_audio = tf.expand_dims(tf.reshape(model.inputs[0], [-1, 8 * 15360]), axis=-1)
