@@ -56,8 +56,8 @@ class MSYNCModel:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
         
         if self.model_params.residual_connection:
-            v1_encoded = tf.keras.layers.concatenate([v1_encoded, v1_input])
-            v2_encoded = tf.keras.layers.concatenate([v2_encoded, v2_input])
+            v1_encoded = tf.keras.layers.concatenate([v1_encoded, v1_logmel])
+            v2_encoded = tf.keras.layers.concatenate([v2_encoded, v2_logmel])
 
         if self.model_params.top_units:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')

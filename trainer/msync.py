@@ -46,7 +46,7 @@ model_params = {'stft_window': 1600,
                 'top_units': [256, 128],
                 'dropout': 0.5,
                 'dmrn': False,
-                'residual_connection': False,
+                'residual_connection': True,
                 'culstm': True
                 }
 
