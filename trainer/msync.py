@@ -35,10 +35,10 @@ data_params = {'sample_rate': 16000,
                'from_bucket': False
                }
 
-model_params = {'stft_window': 3200,
+model_params = {'stft_window': 1600,
                 'stft_step': 160,
                 'num_mel_bins': 256,
-                'num_spectrogram_bins':2049,
+                'num_spectrogram_bins': 1025,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'encoder_arch': 'lstm',
@@ -46,11 +46,12 @@ model_params = {'stft_window': 3200,
                 'top_units': [256, 128],
                 'dropout': 0.5,
                 'dmrn': False,
+                'residual_connection': False,
                 'culstm': True
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 60,
+                'epochs': 40,
                 'steps_per_epoch': 25,
                 'val_steps': 25
                 }

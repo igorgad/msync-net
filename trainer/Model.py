@@ -54,6 +54,10 @@ class MSYNCModel:
 
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
+        
+        if self.model_params.residual_connection:
+            v1_encoded = tf.keras.layers.concatenate([v1_encoded, v1_input])
+            v2_encoded = tf.keras.layers.concatenate([v2_encoded, v2_input])
 
         if self.model_params.top_units:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
@@ -61,7 +65,7 @@ class MSYNCModel:
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
         ecl = DiagMean()(ecl)
-        ecl = tf.keras.layers.Softmax(name='ecl_softmax')(ecl)
+        ecl = tf.keras.layers.Softmax(name='ecl_output')(ecl)
 
         self.model = tf.keras.Model([v1_input, v2_input], ecl)
         return self.model
