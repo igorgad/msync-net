@@ -35,23 +35,23 @@ data_params = {'sample_rate': 16000,
                'from_bucket': False
                }
 
-model_params = {'stft_window': 1600,
+model_params = {'stft_window': 3200,
                 'stft_step': 160,
                 'num_mel_bins': 256,
-                'num_spectrogram_bins': 1025,
+                'num_spectrogram_bins': 2049,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'encoder_arch': 'lstm',
                 'encoder_units': [512, 256],
                 'top_units': [256, 128],
-                'dropout': 0.5,
+                'dropout': 0.6,
                 'dmrn': False,
-                'residual_connection': True,
+                'residual_connection': False,
                 'culstm': True
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 40,
+                'epochs': 60,
                 'steps_per_epoch': 25,
                 'val_steps': 25
                 }
@@ -65,7 +65,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master-lstm-catloss/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master-lstm/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if not params.logdir.startswith('gs://'):
     logname = os.path.join(params.logdir, logname)
@@ -74,7 +74,7 @@ if not params.logdir.startswith('gs://'):
 checkpoint = tf.keras.callbacks.ModelCheckpoint(logname + '/model-checkpoint.hdf5', monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir=logname, histogram_freq=4, batch_size=params.random_batch_size, write_images=True)
-lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
 callbacks = [checkpoint, tensorboard, lr_reducer]
 metrics=[utils.absolute_range_categorical_accuracy, utils.top1_range_categorical_accuracy, utils.top3_range_categorical_accuracy]
 
