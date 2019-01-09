@@ -44,7 +44,7 @@ model_params = {'stft_window': 3200,
                 'encoder_arch': 'lstm',
                 'encoder_units': [512, 256],
                 'top_units': [256, 128],
-                'dropout': 0.6,
+                'dropout': 0.5,
                 'dmrn': False,
                 'residual_connection': False,
                 'culstm': True
