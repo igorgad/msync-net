@@ -25,8 +25,8 @@ data_params = {'sample_rate': 16000,
                'max_delay': 2 * 15360,
                'labels_precision': 15360 // 1,
                'random_batch_size': 16,
-               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'drum set',  #'electric bass',
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'electric bass',  #'clean electric guitar',
                'split_seed': 3,
                'split_rate': 0.8,
                'debug_auto': False,
@@ -51,7 +51,7 @@ model_params = {'stft_window': 3200,
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 60,
+                'epochs': 40,
                 'steps_per_epoch': 25,
                 'val_steps': 25
                 }
@@ -74,7 +74,7 @@ if not params.logdir.startswith('gs://'):
 checkpoint = tf.keras.callbacks.ModelCheckpoint(logname + '/model-checkpoint.hdf5', monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
 tensorboard = stats.TensorBoardAVE(log_dir=logname, histogram_freq=4, batch_size=params.random_batch_size, write_images=True)
-lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=2, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
 callbacks = [checkpoint, tensorboard, lr_reducer]
 metrics=[utils.absolute_range_categorical_accuracy, utils.top1_range_categorical_accuracy, utils.top3_range_categorical_accuracy]
 
