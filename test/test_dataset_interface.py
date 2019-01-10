@@ -17,8 +17,8 @@ data_params = {'sample_rate': 16000,
                'max_delay': 2 * 15360,
                'labels_precision': 15360 // 1,
                'random_batch_size': 16,
-               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'drum set',
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'electric bass',
                'split_seed': 3,
                'split_rate': 0.8,
                'debug_auto': False,
@@ -60,16 +60,32 @@ config.gpu_options.allow_growth = True
 sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
-tfdataset = dts.cached_pipeline(params)
-ex = tfdataset.make_one_shot_iterator().get_next()
-rr = []
+tfdataset = dts.base_pipeline(params)
+train_dataset = tfdataset.filter(dts.select_train_examples)
+val_dataset = tfdataset.filter(dts.select_val_examples)
 
+nt = 0
+nv = 0
+
+ex = train_dataset.make_one_shot_iterator().get_next()
 while True:
     try:
         r = sess.run(ex)
-        rr.append(r['instruments'])
+        nt += 1
 
     except Exception as e:
         print (str(e))
         break
 
+ex = val_dataset.make_one_shot_iterator().get_next()
+while True:
+    try:
+        r = sess.run(ex)
+        nv += 1
+
+    except Exception as e:
+        print (str(e))
+        break
+
+print ('total: ' + str(nt + nv))
+print ('train: ' + str(nt) + ', test: ' + str(nv))
