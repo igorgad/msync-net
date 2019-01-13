@@ -63,9 +63,13 @@ class MSYNCModel:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
+        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v1_encoded', tf.expand_dims(enc, -1)), name='sum_v1_encoded')(v1_encoded)
+        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v2_encoded', tf.expand_dims(enc, -1)), name='sum_v2_encoded')(v2_encoded)
+
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
         ecl = DiagMean()(ecl)
         ecl = tf.keras.layers.Softmax(name='ecl_output')(ecl)
+#         ecl = tf.keras.layers.Activation('sigmoid', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model([v1_input, v2_input], ecl)
         return self.model
