@@ -6,7 +6,7 @@ DATASET_AUDIO_DIR=gs://ms-bucket/datasets/MedleyDB/Audio
 LOG_DIR=gs://ms-bucket/MSYNC/logs
 EPOCHS=50
 
-JOB_NAME=test_master_lstmjob3
+JOB_NAME=train_master_lstm_singlesoftmax_job0
 
 gcloud ml-engine jobs submit training $JOB_NAME \
                                     --stream-logs \

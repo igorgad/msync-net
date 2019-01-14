@@ -25,7 +25,7 @@ class MSYNCModel:
     def build_top_model(self, encoded, name=''):
         output = encoded
         for layer, units in enumerate(self.model_params.top_units[:-1]):
-            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units), name=name + 'fc_block%d/fc' % layer)(encoded)
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units), name=name + 'fc_block%d/fc' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block%d/bn' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block%d/elu' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.model_params.dropout), name=name + 'fc_block%d/dropout' % layer)(output)
@@ -62,9 +62,6 @@ class MSYNCModel:
         if self.model_params.top_units:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
-
-        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v1_encoded', tf.expand_dims(enc, -1)), name='sum_v1_encoded')(v1_encoded)
-        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v2_encoded', tf.expand_dims(enc, -1)), name='sum_v2_encoded')(v2_encoded)
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
         ecl = DiagMean()(ecl)
@@ -166,7 +163,9 @@ class DiagMean(tf.keras.layers.Layer):
         nx = tf.add(ny, diagi)
         flat_indices = ny * tf.shape(mat)[1] + nx
         flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
-        return -1 * tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
+        mean = tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
+        centered_mean = mean - tf.reduce_mean(mean, axis=-1)
+        return -1 * centered_mean
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]

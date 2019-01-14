@@ -23,26 +23,30 @@ def focal_loss(gamma=2, alpha=0.75):
 
 
 def absolute_range_categorical_accuracy(y_true, y_pred):
-    max_dist_index_pred = tf.cast(tf.one_hot(tf.argmax(y_pred, axis=-1), tf.shape(y_pred)[-1]), tf.bool)
-    max_dist_index_true = tf.greater(y_true, tf.reduce_min(y_true, axis=-1, keepdims=True))
-    range_acc = tf.reduce_any(tf.logical_and(max_dist_index_pred, max_dist_index_true), axis=1)
-    return tf.reduce_mean(tf.cast(range_acc, tf.float32))
+    with tf.device('/device:CPU:0'):
+        max_dist_index_pred = tf.cast(tf.one_hot(tf.argmax(y_pred, axis=-1), tf.shape(y_pred)[-1]), tf.bool)
+        max_dist_index_true = tf.greater(y_true, tf.reduce_min(y_true, axis=-1, keepdims=True))
+        range_acc = tf.reduce_any(tf.logical_and(max_dist_index_pred, max_dist_index_true), axis=1)
+        result = tf.reduce_mean(tf.cast(range_acc, tf.float32))
+    return result
 
 
 def topn_range_categorical_accuracy(n, range=0):
     def internal_topn_range_categorical_accuracy(y_true, y_pred):
-        trail = tf.transpose(tf.map_fn(lambda i: zero_descent(y_pred, i), tf.range(1, tf.shape(y_pred)[-1]), dtype=tf.float32), [1, 0])
-        trail_rev = tf.reverse(trail, axis=[-1])
-        lead = tf.transpose(tf.map_fn(lambda i: zero_descent(trail_rev, i), tf.range(1, tf.shape(trail_rev)[-1]), dtype=tf.float32), [1, 0])
-        lead = tf.reverse(lead, axis=[-1])
-        tops = tf.math.top_k(lead, n)
-        max_dist_index_pred = tf.map_fn(lambda i: tf.cast(tf.reduce_sum(tf.one_hot(i, tf.shape(y_pred)[-1]), axis=0), tf.bool), tops.indices, dtype=tf.bool)
+        with tf.device('/device:CPU:0'):
+            trail = tf.transpose(tf.map_fn(lambda i: zero_descent(y_pred, i), tf.range(1, tf.shape(y_pred)[-1]), dtype=tf.float32), [1, 0])
+            trail_rev = tf.reverse(trail, axis=[-1])
+            lead = tf.transpose(tf.map_fn(lambda i: zero_descent(trail_rev, i), tf.range(1, tf.shape(trail_rev)[-1]), dtype=tf.float32), [1, 0])
+            lead = tf.reverse(lead, axis=[-1])
+            tops = tf.math.top_k(lead, n)
+            max_dist_index_pred = tf.map_fn(lambda i: tf.cast(tf.reduce_sum(tf.one_hot(i, tf.shape(y_pred)[-1]), axis=0), tf.bool), tops.indices, dtype=tf.bool)
 
-        middle_vals = tf.argmax(y_true, axis=-1)
-        max_dist_index_true = tf.map_fn(lambda val: tf.cast(tf.reduce_sum(tf.one_hot(tf.range(val - range // 2, 1 + val + range // 2), tf.shape(y_pred)[-1]), axis=0), tf.bool), middle_vals, dtype=tf.bool)
+            middle_vals = tf.argmax(y_true, axis=-1)
+            max_dist_index_true = tf.map_fn(lambda val: tf.cast(tf.reduce_sum(tf.one_hot(tf.range(val - range // 2, 1 + val + range // 2), tf.shape(y_pred)[-1]), axis=0), tf.bool), middle_vals, dtype=tf.bool)
 
-        range_acc = tf.reduce_any(tf.logical_and(max_dist_index_pred, max_dist_index_true), axis=1)
-        return tf.reduce_mean(tf.cast(range_acc, tf.float32))
+            range_acc = tf.reduce_any(tf.logical_and(max_dist_index_pred, max_dist_index_true), axis=1)
+            result = tf.reduce_mean(tf.cast(range_acc, tf.float32))
+        return result
 
     func = internal_topn_range_categorical_accuracy
     func.__name__ = 'top%d_range%d_accuracy' % (n, range)
