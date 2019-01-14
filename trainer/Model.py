@@ -1,5 +1,6 @@
-
 import tensorflow as tf
+
+
 # from MSYNC.vggish import vggish
 
 
@@ -10,7 +11,7 @@ class MSYNCModel:
         self.model_params = model_params
 
     def build_conv_encoder_model(self, encoded, name=''):
-        encoded = tf.keras.layers.Lambda(lambda enc: tf.expand_dims(enc, axis=-1), name=name+'expandLastDim')(encoded)
+        encoded = tf.keras.layers.Lambda(lambda enc: tf.expand_dims(enc, axis=-1), name=name + 'expandLastDim')(encoded)
         for layer, units in enumerate(self.model_params.encoder_units):
             encoded = tf.keras.layers.Conv2D(units, (3, 3), activation='elu', padding='same', name=name + 'vgg_block%d/conv' % layer)(encoded)
             encoded = tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same', name=name + 'vgg_block%d/pool' % layer)(encoded)
@@ -19,7 +20,7 @@ class MSYNCModel:
     def build_lstm_encoder_model(self, encoded, name=''):
         lstm_cell = tf.keras.layers.CuDNNLSTM if self.model_params.culstm else tf.keras.layers.LSTM
         for layer, units in enumerate(self.model_params.encoder_units):
-            encoded = tf.keras.layers.Bidirectional(lstm_cell(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
+            encoded = tf.keras.layers.Bidirectional(lstm_cell(units, return_sequences=True), name=name + 'lstm_encoder/lstm' + str(layer))(encoded)
         return encoded
 
     def build_top_model(self, encoded, name=''):
@@ -37,7 +38,7 @@ class MSYNCModel:
     def build_model(self):
         v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
         v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
-        
+
         v1_logmel = LogMel(params=self.model_params, name='v1logmel')(v1_input)
         v2_logmel = LogMel(params=self.model_params, name='v2logmel')(v2_input)
 
@@ -49,12 +50,12 @@ class MSYNCModel:
             v1_encoded = self.build_conv_encoder_model(v1_logmel, 'v1')
             v2_encoded = self.build_conv_encoder_model(v2_logmel, 'v2')
         else:
-            print (self.model_params.encoder_arch + ' UNKNOW ENCODER')
+            print(self.model_params.encoder_arch + ' UNKNOW ENCODER')
             exit(0)
 
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
-        
+
         if self.model_params.residual_connection:
             v1_encoded = tf.keras.layers.concatenate([v1_encoded, v1_logmel])
             v2_encoded = tf.keras.layers.concatenate([v2_encoded, v2_logmel])
@@ -63,9 +64,12 @@ class MSYNCModel:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
+        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v1_encoded', tf.expand_dims(enc, -1)), name='sum_v1_encoded')(v1_encoded)
+        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v2_encoded', tf.expand_dims(enc, -1)), name='sum_v2_encoded')(v2_encoded)
+
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
         ecl = DiagMean()(ecl)
-        ecl = tf.keras.layers.Softmax(name='ecl_output')(ecl)
+        ecl = tf.keras.layers.Activation('softmax' if self.model_params.labels_precision == 0 else 'sigmoid', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model([v1_input, v2_input], ecl)
         return self.model
@@ -91,15 +95,8 @@ class LogMel(tf.keras.layers.Layer):
         return output
 
     def build(self, input_shape):
-        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
-            num_mel_bins=self.params.num_mel_bins,
-            num_spectrogram_bins=self.params.num_spectrogram_bins,
-            sample_rate=self.params.sample_rate,
-            lower_edge_hertz=self.params.lower_edge_hertz,
-            upper_edge_hertz=self.params.upper_edge_hertz,
-            dtype=tf.float32,
-            name=None
-        )
+        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=self.params.num_spectrogram_bins, sample_rate=self.params.sample_rate, lower_edge_hertz=self.params.lower_edge_hertz, upper_edge_hertz=self.params.upper_edge_hertz,
+            dtype=tf.float32, name=None)
 
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
@@ -169,13 +166,13 @@ class DiagMean(tf.keras.layers.Layer):
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]
-        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps//2, 1 + num_time_steps//2), dtype=tf.float32)
+        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps // 2, 1 + num_time_steps // 2), dtype=tf.float32)
         mean = tf.transpose(mean)
-        mean.set_shape([inputs.shape[0], inputs.shape[1]//2 + inputs.shape[2]//2 + 1])
+        mean.set_shape([inputs.shape[0], inputs.shape[1] // 2 + inputs.shape[2] // 2 + 1])
         return mean
 
     def build(self, input_shape):
         super(DiagMean, self).build(input_shape)  # Be sure to call this at the end
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1]//2 + input_shape[2]//2 + 1))
+        return tf.TensorShape((input_shape[0], input_shape[1] // 2 + input_shape[2] // 2 + 1))

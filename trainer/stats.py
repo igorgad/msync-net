@@ -12,14 +12,16 @@ def create_ave_image(ecl_distance, targets, range):
 
     ecl_curve = (ecl_curve - np.min(ecl_curve)) / (np.max(ecl_curve) - np.min(ecl_curve))
     target_curve = (target_curve - np.min(target_curve)) / (np.max(target_curve) - np.min(target_curve))
+    target_mid_true = np.where(target_curve > 0.8 * target_curve.max(-1))[0]
+    target_mid_true = target_mid_true[len(target_mid_true) // 2]
 
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)
     ax.plot(np.arange(-ecl_distance.shape[1] //2 + 1, ecl_distance.shape[1] // 2 + 1), ecl_curve)
-    # ax.plot(np.arange(-ecl_distance.shape[1] // 2 + 1, ecl_distance.shape[1] // 2 + 1), target_curve)
+    ax.plot(np.arange(-ecl_distance.shape[1] // 2 + 1, ecl_distance.shape[1] // 2 + 1), target_curve)
     # ax.axvline(np.argmax(targets[0, :]) - ecl_distance.shape[1] //2 + 1)
-    ax.axvline(np.argmax(targets[0, :]) - range // 2 - ecl_distance.shape[1] //2 + 1)
-    ax.axvline(np.argmax(targets[0, :]) + range // 2 - ecl_distance.shape[1] //2 + 1)
+    ax.axvline(target_mid_true - range // 2 - ecl_distance.shape[1] //2)
+    ax.axvline(target_mid_true + range // 2 - ecl_distance.shape[1] //2 + 1)
     return fig
 
 
