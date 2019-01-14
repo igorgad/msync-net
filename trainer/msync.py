@@ -8,11 +8,6 @@ import trainer.stats as stats
 from trainer.Model import MSYNCModel
 from tensorflow.python.lib.io import file_io
 
-def copy_file_to_gcs(job_dir, file_path):
-  with file_io.FileIO(file_path, mode='rb') as input_f:
-    with file_io.FileIO(
-        os.path.join(job_dir, file_path), mode='w+') as output_f:
-      output_f.write(input_f.read())
 
 tf.set_random_seed(26)
 
@@ -74,6 +69,8 @@ if params.logdir.startswith('gs://'):
 else:
     checkpoint_file = os.path.join(params.logdir, logname + '/model-checkpoint.hdf5')
 
+# Build Data Pipeline
+train_data, validation_data = dataset_interface.pipeline(params)
 
 # Set callbacks
 checkpoint = tf.keras.callbacks.ModelCheckpoint(checkpoint_file, monitor='val_loss', period=1, save_best_only=True)
@@ -81,18 +78,20 @@ early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, p
 tensorboard = stats.TensorBoardAVE(log_dir=os.path.join(params.logdir, logname), histogram_freq=4, batch_size=params.random_batch_size, write_images=True, range=params.labels_precision[0] // params.stft_step)
 lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.25, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
 callbacks = [checkpoint, tensorboard, lr_reducer]
+
+# Set Metrics and Losses
 metrics_ecl = [utils.topn_range_categorical_accuracy(n=n, range=range // params.stft_step) for n in [1, 3] for range in params.labels_precision]
 metrics_cnn = [tf.keras.metrics.categorical_accuracy, tf.keras.metrics.top_k_categorical_accuracy]
-loss_weights = {'ecl_output': 1.0, 'cnn_output': 0.5}
+losses = {'ecl_output': tf.keras.losses.categorical_crossentropy, 'cnn_output': tf.keras.losses.categorical_crossentropy}
+loss_weights = {'ecl_output': 1.0, 'cnn_output': 1.0}
 
-# Build Data Pipeline and Model
-train_data, validation_data = dataset_interface.pipeline(params)
+# Build Model
 msync_model = MSYNCModel(input_shape=(params.example_length,), model_params=params)
 model = msync_model.build_model()
+model.compile(loss=losses, loss_weights=loss_weights, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics={'ecl_output': metrics_ecl, 'cnn_output': metrics_cnn})
 model.summary()
 
 try:
-    model.compile(loss=tf.keras.losses.categorical_crossentropy, loss_weights=loss_weights, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics={'ecl_output': metrics_ecl, 'cnn_output': metrics_cnn})
     model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
 finally:
     if params.logdir.startswith('gs://'):

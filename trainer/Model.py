@@ -1,5 +1,6 @@
-
 import tensorflow as tf
+
+
 # from MSYNC.vggish import vggish
 
 
@@ -11,7 +12,7 @@ class MSYNCModel:
 
     def build_conv_classifier(self, cnn, name='class'):
         for layer, units in enumerate(self.model_params.class_units):
-            cnn = tf.keras.layers.BatchNormalization()(cnn)
+            cnn = tf.keras.layers.BatchNormalization(name=name + '/bn%d' % layer)(cnn)
             cnn = tf.keras.layers.Conv2D(units, (3, 3), activation='elu', padding='same', name=name + '/conv%d' % layer)(cnn)
             cnn = tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same', name=name + '/pool%d' % layer)(cnn)
         return cnn
@@ -19,7 +20,7 @@ class MSYNCModel:
     def build_lstm_encoder_model(self, encoded, name=''):
         lstm_cell = tf.keras.layers.CuDNNLSTM if self.model_params.culstm else tf.keras.layers.LSTM
         for layer, units in enumerate(self.model_params.encoder_units):
-            encoded = tf.keras.layers.Bidirectional(lstm_cell(units, return_sequences=True), name=name+'lstm_encoder/lstm'+str(layer))(encoded)
+            encoded = tf.keras.layers.Bidirectional(lstm_cell(units, return_sequences=True), name=name + 'lstm_encoder/lstm' + str(layer))(encoded)
         return encoded
 
     def build_top_model(self, encoded, name=''):
@@ -37,7 +38,7 @@ class MSYNCModel:
     def build_model(self):
         v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
         v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
-        
+
         v1_logmel = LogMel(params=self.model_params, name='v1logmel')(v1_input)
         v2_logmel = LogMel(params=self.model_params, name='v2logmel')(v2_input)
 
@@ -46,7 +47,7 @@ class MSYNCModel:
 
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
-        
+
         if self.model_params.residual_connection:
             v1_encoded = tf.keras.layers.concatenate([v1_encoded, v1_logmel])
             v2_encoded = tf.keras.layers.concatenate([v2_encoded, v2_logmel])
@@ -55,15 +56,12 @@ class MSYNCModel:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
-        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v1_encoded', tf.expand_dims(enc, -1)), name='sum_v1_encoded')(v1_encoded)
-        tf.keras.layers.Lambda(lambda enc: tf.summary.image('v2_encoded', tf.expand_dims(enc, -1)), name='sum_v2_encoded')(v2_encoded)
-
         ecl_mat = EclDistanceMat()([v1_encoded, v2_encoded])
-        ecl = tf.keras.layers.Lambda(lambda mat: tf.reduce_mean(mat, axis=-1, keep_dims=True), name='ChannelMean')(ecl_mat)
+        ecl = ChannelMean()(ecl_mat)
         ecl = DiagMean()(ecl)
         ecl = tf.keras.layers.Softmax(name='ecl_output')(ecl)
 
-        cnn = tf.keras.layers.Lambda(lambda input: tf.keras.backend.stop_gradient(input), name='StopGradient')(ecl_mat)
+        cnn = StopGradAndNormalize()(ecl_mat)
         cnn = self.build_conv_classifier(cnn)
         cnn = tf.keras.layers.Flatten()(cnn)
         cnn = tf.keras.layers.Dense(ecl.shape[-1], activation='softmax', name='cnn_output')(cnn)
@@ -92,17 +90,10 @@ class LogMel(tf.keras.layers.Layer):
         return output
 
     def build(self, input_shape):
-        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
-            num_mel_bins=self.params.num_mel_bins,
-            num_spectrogram_bins=self.params.num_spectrogram_bins,
-            sample_rate=self.params.sample_rate,
-            lower_edge_hertz=self.params.lower_edge_hertz,
-            upper_edge_hertz=self.params.upper_edge_hertz,
-            dtype=tf.float32,
-            name=None
-        )
+        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=self.params.num_spectrogram_bins, sample_rate=self.params.sample_rate, lower_edge_hertz=self.params.lower_edge_hertz, upper_edge_hertz=self.params.upper_edge_hertz,
+            dtype=tf.float32, name=None)
 
-        super(LogMel, self).build(input_shape)  # Be sure to call this at the end
+        super(LogMel, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape((input_shape[0], input_shape[1] // self.params.stft_step, self.params.num_mel_bins))
@@ -110,7 +101,6 @@ class LogMel(tf.keras.layers.Layer):
 
 class DMRNLayer(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
-        self.mel_matrix = None
         super(DMRNLayer, self).__init__(**kwargs)
 
     def fusion_function(self, x, y):
@@ -123,7 +113,7 @@ class DMRNLayer(tf.keras.layers.Layer):
         return x, y
 
     def build(self, input_shape):
-        super(DMRNLayer, self).build(input_shape)  # Be sure to call this at the end
+        super(DMRNLayer, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
         shape1, shape2 = input_shape
@@ -132,7 +122,6 @@ class DMRNLayer(tf.keras.layers.Layer):
 
 class EclDistanceMat(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
-        self.mel_matrix = None
         super(EclDistanceMat, self).__init__(**kwargs)
 
     def distance(self, x, y):
@@ -142,12 +131,11 @@ class EclDistanceMat(tf.keras.layers.Layer):
         x, y = inputs
         mat = tf.map_fn(lambda ri: self.distance(tf.expand_dims(x[:, ri, :], axis=1), y[:, :, :]), tf.range(tf.shape(x)[1]), dtype=tf.float32)
         mat = tf.transpose(mat, [1, 0, 2, 3])
-        mat.set_shape([inputs[0].shape[0], inputs[0].shape[1], inputs[1].shape[1], inputs[1].shape[2]])
-        tf.summary.image('ecldist_mat', mat)
+        mat.set_shape([inputs[0].shape[0], inputs[0].shape[1], inputs[1].shape[1], inputs[0].shape[2]])
         return mat
 
     def build(self, input_shape):
-        super(EclDistanceMat, self).build(input_shape)  # Be sure to call this at the end
+        super(EclDistanceMat, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
         shape1, shape2 = input_shape
@@ -156,7 +144,6 @@ class EclDistanceMat(tf.keras.layers.Layer):
 
 class DiagMean(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
-        self.mel_matrix = None
         super(DiagMean, self).__init__(**kwargs)
 
     def diag_mean(self, mat, diagi):
@@ -164,17 +151,52 @@ class DiagMean(tf.keras.layers.Layer):
         nx = tf.add(ny, diagi)
         flat_indices = ny * tf.shape(mat)[1] + nx
         flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
-        return -1 * tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
+        mean = tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
+        centered_mean = mean - tf.reduce_mean(mean, axis=-1)
+        return -1 * centered_mean
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]
-        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps//2, 1 + num_time_steps//2), dtype=tf.float32)
+        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps // 2, 1 + num_time_steps // 2), dtype=tf.float32)
         mean = tf.transpose(mean)
-        mean.set_shape([inputs.shape[0], inputs.shape[1]//2 + inputs.shape[2]//2 + 1])
+        mean.set_shape([inputs.shape[0], inputs.shape[1] // 2 + inputs.shape[2] // 2 + 1])
         return mean
 
     def build(self, input_shape):
-        super(DiagMean, self).build(input_shape)  # Be sure to call this at the end
+        super(DiagMean, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1]//2 + input_shape[2]//2 + 1))
+        return tf.TensorShape((input_shape[0], input_shape[1] // 2 + input_shape[2] // 2 + 1))
+
+
+class ChannelMean(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(ChannelMean, self).__init__(**kwargs)
+
+    def call(self, inputs, *args, **kwargs):
+        mean = tf.norm(inputs, axis=-1, keep_dims=True)
+        tf.summary.image('avg_ecl_mat', mean)
+        return mean
+
+    def build(self, input_shape):
+        super(ChannelMean, self).build(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape((input_shape[0], input_shape[1], input_shape[2], 1))
+
+
+class StopGradAndNormalize(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(StopGradAndNormalize, self).__init__(**kwargs)
+
+    def call(self, inputs, *args, **kwargs):
+        mat = tf.map_fn(lambda img: tf.image.per_image_standardization(img), inputs)
+        mat = tf.keras.backend.stop_gradient(mat)
+        return mat
+
+    def build(self, input_shape):
+        super(StopGradAndNormalize, self).build(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
