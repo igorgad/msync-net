@@ -23,7 +23,7 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
                'max_delay': 2 * 15360,
-               'random_batch_size': 8,
+               'random_batch_size': 16,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 3,
@@ -40,9 +40,9 @@ model_params = {'stft_window': 3200,
                 'num_spectrogram_bins': 2049,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
-                'encoder_arch': 'lstm',
                 'encoder_units': [512, 256],
                 'top_units': [256, 128],
+                'class_units': [64, 64, 64, 64],
                 'dropout': 0.5,
                 'dmrn': False,
                 'residual_connection': False,
@@ -66,7 +66,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master-lstm-rangemetrics/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '').replace('[','').replace(']','')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master-lstm-cnn/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '').replace('[','').replace(']','')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)
@@ -81,7 +81,9 @@ early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, p
 tensorboard = stats.TensorBoardAVE(log_dir=os.path.join(params.logdir, logname), histogram_freq=4, batch_size=params.random_batch_size, write_images=True, range=params.labels_precision[0] // params.stft_step)
 lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.25, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
 callbacks = [checkpoint, tensorboard, lr_reducer]
-metrics = [utils.topn_range_categorical_accuracy(n=n, range=range // params.stft_step) for n in [1, 3] for range in params.labels_precision]
+metrics_ecl = [utils.topn_range_categorical_accuracy(n=n, range=range // params.stft_step) for n in [1, 3] for range in params.labels_precision]
+metrics_cnn = [tf.keras.metrics.categorical_accuracy, tf.keras.metrics.top_k_categorical_accuracy]
+loss_weights = {'ecl_output': 1.0, 'cnn_output': 0.5}
 
 # Build Data Pipeline and Model
 train_data, validation_data = dataset_interface.pipeline(params)
@@ -90,7 +92,7 @@ model = msync_model.build_model()
 model.summary()
 
 try:
-    model.compile(loss=tf.keras.losses.categorical_crossentropy, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
+    model.compile(loss=tf.keras.losses.categorical_crossentropy, loss_weights=loss_weights, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics={'ecl_output': metrics_ecl, 'cnn_output': metrics_cnn})
     model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
 finally:
     if params.logdir.startswith('gs://'):

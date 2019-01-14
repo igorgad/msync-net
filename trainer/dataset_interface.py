@@ -184,7 +184,7 @@ def compute_one_hot_delay(parsed_features, data_params):
 
 def prepare_examples(parsed_features, data_params):
     data = {'v1input': parsed_features['signals'][0], 'v2input': parsed_features['signals'][1]}
-    labels = parsed_features['one_hot_delay']
+    labels = {'ecl_output': parsed_features['one_hot_delay'], 'cnn_output': parsed_features['one_hot_delay']}
     example = data, labels
     return example
 
