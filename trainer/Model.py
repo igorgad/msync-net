@@ -166,7 +166,9 @@ class DiagMean(tf.keras.layers.Layer):
         nx = tf.add(ny, diagi)
         flat_indices = ny * tf.shape(mat)[1] + nx
         flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
-        return -1 * tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
+        mean = tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
+        centered_mean = mean - tf.reduce_mean(mean, axis=-1)
+        return -1 * centered_mean
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]

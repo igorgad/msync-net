@@ -8,12 +8,6 @@ import trainer.stats as stats
 from trainer.Model import MSYNCModel
 from tensorflow.python.lib.io import file_io
 
-def copy_file_to_gcs(job_dir, file_path):
-  with file_io.FileIO(file_path, mode='rb') as input_f:
-    with file_io.FileIO(
-        os.path.join(job_dir, file_path), mode='w+') as output_f:
-      output_f.write(input_f.read())
-
 tf.set_random_seed(26)
 
 dataset = 'medleydb'
@@ -66,7 +60,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master-lstm/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '').replace('[','').replace(']','')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master-lstm-cmean/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '').replace('[','').replace(']','')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)
