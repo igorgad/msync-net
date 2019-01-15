@@ -18,7 +18,7 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
                'max_delay': 2 * 15360,
-               'random_batch_size': 16,
+               'random_batch_size': 4,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 3,
@@ -36,8 +36,8 @@ model_params = {'stft_window': 3200,
                 'lower_edge_hertz': 125.0,
                 'upper_edge_hertz': 7500.0,
                 'encoder_units': [512, 256],
-                'top_units': [256, 128],
-                'class_units': [64, 64, 64, 64],
+                'top_units': [256, 32],
+                'class_units': [32, 32, 32, 32],
                 'dropout': 0.5,
                 'dmrn': False,
                 'residual_connection': False,
@@ -45,7 +45,7 @@ model_params = {'stft_window': 3200,
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 40,
+                'epochs': 100,
                 'steps_per_epoch': 25,
                 'val_steps': 25,
                 'labels_precision': [15360 // 1, 15360 // 2, 15360 // 4],
@@ -75,9 +75,9 @@ train_data, validation_data = dataset_interface.pipeline(params)
 # Set callbacks
 checkpoint = tf.keras.callbacks.ModelCheckpoint(checkpoint_file, monitor='val_loss', period=1, save_best_only=True)
 early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
-tensorboard = stats.TensorBoardAVE(log_dir=os.path.join(params.logdir, logname), histogram_freq=4, batch_size=params.random_batch_size, write_images=True, range=params.labels_precision[0] // params.stft_step)
+tensorboard = stats.TensorBoardAVE(log_dir=os.path.join(params.logdir, logname + '/ecl'), histogram_freq=4, batch_size=params.random_batch_size, write_images=True, range=params.labels_precision[0] // params.stft_step)
 lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.25, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
-callbacks = [checkpoint, tensorboard, lr_reducer]
+callbacks = [checkpoint, tensorboard, lr_reducer, early_stop]
 
 # Set Metrics and Losses
 metrics_ecl = [utils.topn_range_categorical_accuracy(n=n, range=range // params.stft_step) for n in [1, 3] for range in params.labels_precision]
@@ -85,17 +85,31 @@ metrics_cnn = [tf.keras.metrics.categorical_accuracy, tf.keras.metrics.top_k_cat
 losses = {'ecl_output': tf.keras.losses.categorical_crossentropy, 'cnn_output': tf.keras.losses.categorical_crossentropy}
 loss_weights = {'ecl_output': 1.0, 'cnn_output': 1.0}
 
-# Build Model
+# Build Whole Model
 msync_model = MSYNCModel(input_shape=(params.example_length,), model_params=params)
 model = msync_model.build_model()
-model.compile(loss=losses, loss_weights=loss_weights, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics={'ecl_output': metrics_ecl, 'cnn_output': metrics_cnn})
 model.summary()
 
-try:
-    model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
-finally:
-    if params.logdir.startswith('gs://'):
-        print('transferring model checkpoint hdf5 to bucket...')
-        with file_io.FileIO(checkpoint_file, mode='rb') as input_f:
-            with file_io.FileIO(os.path.join(params.logdir, logname + '/model-checkpoint.hdf5'), mode='w+') as output_f:
-                output_f.write(input_f.read())
+# Train or Load ecl part of the model
+ecl_model = tf.keras.Model(model.inputs, model.output[0])
+if os.path.isfile(checkpoint_file):
+    ecl_model.load_weights(checkpoint_file)
+else:
+    ecl_model.compile(loss=losses['ecl_output'], optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics={'ecl_output': metrics_ecl})
+    ecl_model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
+
+# Lock ecl layers
+for layer in ecl_model.layers:
+    layer.trainable = False
+
+# Train CNN layers
+tensorboard = tf.keras.callbacks.TensorBoard(log_dir=os.path.join(params.logdir, logname + '/cnn'), histogram_freq=0, batch_size=params.random_batch_size, write_images=False)
+cnn_model = tf.keras.Model(model.inputs, model.output[1])
+cnn_model.compile(loss=losses['cnn_output'], optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics={'cnn_output': metrics_cnn})
+cnn_model.fit(train_data, epochs=100, steps_per_epoch=100, validation_data=validation_data, validation_steps=25, callbacks=[tensorboard], verbose=params.verbose)
+
+if params.logdir.startswith('gs://'):
+    print('transferring model checkpoint hdf5 to bucket...')
+    with file_io.FileIO(checkpoint_file, mode='rb') as input_f:
+        with file_io.FileIO(os.path.join(params.logdir, logname + '/model-checkpoint.hdf5'), mode='w+') as output_f:
+            output_f.write(input_f.read())
