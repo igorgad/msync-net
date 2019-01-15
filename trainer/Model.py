@@ -49,7 +49,7 @@ class MSYNCModel:
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
         ecl = DiagMean()(ecl)
-        ecl = tf.keras.layers.Activation('softmax' if self.model_params.labels_precision == 0 else 'sigmoid', name='ecl_output')(ecl)
+        ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model([v1_input, v2_input], ecl)
         return self.model

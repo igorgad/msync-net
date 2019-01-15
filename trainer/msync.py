@@ -75,7 +75,7 @@ tensorboard = stats.TensorBoardAVE(log_dir=os.path.join(params.logdir, logname),
 lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
 callbacks = [checkpoint, tensorboard, lr_reducer]
 metrics = [utils.topn_range_categorical_accuracy(n=n, range=range // params.stft_step) for n in [1, 5] for range in params.metrics_range]
-loss = tf.keras.losses.categorical_crossentropy if params.labels_precision == 0 else tf.keras.losses.binary_crossentropy
+loss = tf.keras.losses.categorical_crossentropy
 
 # Build Data Pipeline and Model
 train_data, validation_data = dataset_interface.pipeline(params)
