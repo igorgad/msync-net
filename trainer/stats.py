@@ -20,8 +20,8 @@ def create_ave_image(ecl_distance, targets, range):
     ax.plot(np.arange(-ecl_distance.shape[1] //2 + 1, ecl_distance.shape[1] // 2 + 1), ecl_curve)
     ax.plot(np.arange(-ecl_distance.shape[1] // 2 + 1, ecl_distance.shape[1] // 2 + 1), target_curve)
     # ax.axvline(np.argmax(targets[0, :]) - ecl_distance.shape[1] //2 + 1)
-    ax.axvline(target_mid_true - range // 2 - ecl_distance.shape[1] //2)
-    ax.axvline(target_mid_true + range // 2 - ecl_distance.shape[1] //2 + 1)
+    ax.axvline(target_mid_true - range // 2 - ecl_distance.shape[1] //2, linestyle='--')
+    ax.axvline(target_mid_true + range // 2 - ecl_distance.shape[1] //2 + 1, linestyle='--')
     return fig
 
 
