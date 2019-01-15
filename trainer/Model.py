@@ -1,7 +1,5 @@
+
 import tensorflow as tf
-
-
-# from MSYNC.vggish import vggish
 
 
 class MSYNCModel:
@@ -9,13 +7,6 @@ class MSYNCModel:
         self.input_shape = input_shape
         self.model = None
         self.model_params = model_params
-
-    def build_conv_encoder_model(self, encoded, name=''):
-        encoded = tf.keras.layers.Lambda(lambda enc: tf.expand_dims(enc, axis=-1), name=name + 'expandLastDim')(encoded)
-        for layer, units in enumerate(self.model_params.encoder_units):
-            encoded = tf.keras.layers.Conv2D(units, (3, 3), activation='elu', padding='same', name=name + 'vgg_block%d/conv' % layer)(encoded)
-            encoded = tf.keras.layers.MaxPooling2D((2, 2), strides=(2, 2), padding='same', name=name + 'vgg_block%d/pool' % layer)(encoded)
-        return encoded
 
     def build_lstm_encoder_model(self, encoded, name=''):
         lstm_cell = tf.keras.layers.CuDNNLSTM if self.model_params.culstm else tf.keras.layers.LSTM
@@ -42,16 +33,8 @@ class MSYNCModel:
         v1_logmel = LogMel(params=self.model_params, name='v1logmel')(v1_input)
         v2_logmel = LogMel(params=self.model_params, name='v2logmel')(v2_input)
 
-        v1_encoded = v2_encoded = None
-        if self.model_params.encoder_arch == 'lstm':
-            v1_encoded = self.build_lstm_encoder_model(v1_logmel, 'v1')
-            v2_encoded = self.build_lstm_encoder_model(v2_logmel, 'v2')
-        elif self.model_params.encoder_arch == 'conv':
-            v1_encoded = self.build_conv_encoder_model(v1_logmel, 'v1')
-            v2_encoded = self.build_conv_encoder_model(v2_logmel, 'v2')
-        else:
-            print(self.model_params.encoder_arch + ' UNKNOW ENCODER')
-            exit(0)
+        v1_encoded = self.build_lstm_encoder_model(v1_logmel, 'v1')
+        v2_encoded = self.build_lstm_encoder_model(v2_logmel, 'v2')
 
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
