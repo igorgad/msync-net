@@ -1,0 +1,41 @@
+trainingInput:
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: epoch_val_top1_range96_accuracy
+    maxTrials: 32
+    maxParallelTrials: 3
+    enableTrialEarlyStopping: True
+    params:
+      - parameterName: lr
+        type: DOUBLE
+        minValue: 0.0000005
+        maxValue: 0.0005
+        scaleType: UNIT_LOG_SCALE
+      - parameterName: dropout
+        type: DOUBLE
+        minValue: 0.2
+        maxValue: 0.6
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: stft_window
+        type: INTEGER
+        minValue: 800
+        maxValue: 6400
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: num_mel_bins
+        type: INTEGER
+        minValue: 64
+        maxValue: 256
+        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: encoder_units
+        type: CATEGORICAL
+        categoricalValues:
+        - 128
+        - 256 128
+        - 512 256 128
+        - 512 256 128 128
+      - parameterName: top_units
+        type: CATEGORICAL
+        categoricalValues:
+        - 128
+        - 256 128
+        - 512 256 128

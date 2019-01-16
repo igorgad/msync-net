@@ -1,5 +1,6 @@
 
 import tensorflow as tf
+import numpy as np
 
 
 class MSYNCModel:
@@ -75,8 +76,9 @@ class LogMel(tf.keras.layers.Layer):
         return output
 
     def build(self, input_shape):
-        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=self.params.num_spectrogram_bins, sample_rate=self.params.sample_rate, lower_edge_hertz=self.params.lower_edge_hertz, upper_edge_hertz=self.params.upper_edge_hertz,
-            dtype=tf.float32, name=None)
+        num_spectrogram_bins = np.power(2, self.params.stft_window.bit_length() - 1) + 1
+        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=num_spectrogram_bins, sample_rate=self.params.sample_rate,
+                                                                        lower_edge_hertz=self.params.lower_edge_hertz, upper_edge_hertz=self.params.upper_edge_hertz, dtype=tf.float32, name=None)
 
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
