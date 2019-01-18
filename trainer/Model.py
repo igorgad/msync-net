@@ -1,5 +1,6 @@
 
 import tensorflow as tf
+import trainer.gfnn as gf
 
 
 class MSYNCModel:
@@ -30,11 +31,14 @@ class MSYNCModel:
         v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
         v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
 
-        v1_logmel = LogMel(params=self.model_params, name='v1logmel')(v1_input)
-        v2_logmel = LogMel(params=self.model_params, name='v2logmel')(v2_input)
+        v1_feat = gf.GFNNLayer(self.model_params.num_mel_bins, 1 / self.model_params.sample_rate, name='v1gfnn')(v1_input)
+        v2_feat = gf.GFNNLayer(self.model_params.num_mel_bins, 1 / self.model_params.sample_rate, name='v2gfnn')(v2_input)
 
-        v1_encoded = self.build_lstm_encoder_model(v1_logmel, 'v1')
-        v2_encoded = self.build_lstm_encoder_model(v2_logmel, 'v2')
+        v1_feat = tf.keras.layers.AveragePooling1D(pool_size=self.model_params.stft_step)(v1_feat)
+        v2_feat = tf.keras.layers.AveragePooling1D(pool_size=self.model_params.stft_step)(v2_feat)
+
+        v1_encoded = self.build_lstm_encoder_model(v1_feat, 'v1')
+        v2_encoded = self.build_lstm_encoder_model(v2_feat, 'v2')
 
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
@@ -47,7 +51,8 @@ class MSYNCModel:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
-        ecl = EclDistanceMat()([v1_encoded, v2_encoded])
+        feat_ecl = EclDistanceMat(name='ref_mat')([v1_feat, v2_feat])
+        ecl = EclDistanceMat(name='ecl_dist_mat')([v1_encoded, v2_encoded])
         ecl = DiagMean()(ecl)
         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
@@ -75,8 +80,9 @@ class LogMel(tf.keras.layers.Layer):
         return output
 
     def build(self, input_shape):
-        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=self.params.num_spectrogram_bins, sample_rate=self.params.sample_rate, lower_edge_hertz=self.params.lower_edge_hertz, upper_edge_hertz=self.params.upper_edge_hertz,
-            dtype=tf.float32, name=None)
+        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=self.params.num_spectrogram_bins,
+                                                                        sample_rate=self.params.sample_rate, lower_edge_hertz=self.params.lower_edge_hertz,
+                                                                        upper_edge_hertz=self.params.upper_edge_hertz, dtype=tf.float32, name=None)
 
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 
@@ -119,7 +125,7 @@ class EclDistanceMat(tf.keras.layers.Layer):
         mat = tf.map_fn(lambda ri: self.distance(tf.expand_dims(x[:, ri, :], axis=1), y[:, :, :]), tf.range(tf.shape(x)[1]), dtype=tf.float32)
         mat = tf.transpose(mat, [1, 0, 2, 3])
         mat.set_shape([inputs[0].shape[0], inputs[0].shape[1], inputs[1].shape[1], 1])
-        tf.summary.image('ecldist_mat', mat)
+        tf.summary.image(self.name, mat)
         return mat
 
     def build(self, input_shape):
