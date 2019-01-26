@@ -82,11 +82,13 @@ loss = tf.keras.losses.categorical_crossentropy
 train_data, validation_data = dataset_interface.pipeline(params)
 msync_model = MSYNCModel(model_params=params)
 model = msync_model.build_model()
-model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
 model.summary()
+nw_model = msync_model.build_nw_model()
+nw_model.summary()
+nw_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
 
 try:
-    model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
+    nw_model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
 finally:
     if params.logdir.startswith('gs://'):
         print('transferring model checkpoint hdf5 to bucket...')

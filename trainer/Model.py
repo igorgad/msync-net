@@ -3,8 +3,8 @@ import tensorflow as tf
 
 
 class MSYNCModel:
-    def __init__(self, input_shape, model_params):
-        self.input_shape = input_shape
+    def __init__(self, model_params):
+        self.input_shape = (model_params.example_length, 2)
         self.model = None
         self.model_params = model_params
 
@@ -27,8 +27,8 @@ class MSYNCModel:
         return output
 
     def build_model(self):
-        v1_input = tf.keras.Input(shape=self.input_shape, name='v1input')
-        v2_input = tf.keras.Input(shape=self.input_shape, name='v2input')
+        inputs = tf.keras.Input(shape=self.input_shape, name='inputs')
+        v1_input, v2_input = tf.keras.layers.Lambda(lambda concat: tf.unstack(concat, axis=-1), name='inputs_unstack')(inputs)
 
         v1_logmel = LogMel(params=self.model_params, name='v1logmel')(v1_input)
         v2_logmel = LogMel(params=self.model_params, name='v2logmel')(v2_input)
@@ -51,8 +51,19 @@ class MSYNCModel:
         ecl = DiagMean()(ecl)
         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
-        self.model = tf.keras.Model([v1_input, v2_input], ecl)
+        self.model = tf.keras.Model(inputs, ecl)
         return self.model
+
+
+    def build_nw_model(self):
+        model = self.model if self.model else self.build_model()
+        inputs = tf.keras.Input(shape=(self.model_params.num_examples,) + self.input_shape, name='inputs')
+        nw_ecl = tf.keras.layers.TimeDistributed(model, name='nw_ecl')(inputs)
+        nw_ecl = tf.keras.layers.Lambda(lambda tensor: tf.reduce_mean(tensor, axis=1), name='nw_mean')(nw_ecl)
+        nw_ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(nw_ecl)
+
+        nw_model = tf.keras.Model(inputs, nw_ecl)
+        return nw_model
 
 
 class LogMel(tf.keras.layers.Layer):
@@ -127,7 +138,7 @@ class EclDistanceMat(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         shape1, shape2 = input_shape
-        return tf.TensorShape((shape1[0], shape1[2], shape2[2], 1))
+        return tf.TensorShape((shape1[0], shape1[1], shape2[1], 1))
 
 
 class DiagMean(tf.keras.layers.Layer):
