@@ -16,6 +16,7 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
+               'num_examples': 1,
                'max_delay': 2 * 15360,
                'labels_precision': 0,
                'random_batch_size': 16,
@@ -60,7 +61,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'MEET/master-lstm-bach10/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master-mw-lstm/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)
@@ -79,7 +80,7 @@ loss = tf.keras.losses.categorical_crossentropy
 
 # Build Data Pipeline and Model
 train_data, validation_data = dataset_interface.pipeline(params)
-msync_model = MSYNCModel(input_shape=(params.example_length,), model_params=params)
+msync_model = MSYNCModel(model_params=params)
 model = msync_model.build_model()
 model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
 model.summary()
