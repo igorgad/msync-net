@@ -60,7 +60,6 @@ class MSYNCModel:
         inputs = tf.keras.Input(shape=(self.model_params.num_examples,) + self.input_shape, name='inputs')
         nw_ecl = tf.keras.layers.TimeDistributed(model, name='nw_ecl')(inputs)
         nw_ecl = tf.keras.layers.Lambda(lambda tensor: tf.reduce_mean(tensor, axis=1), name='nw_mean')(nw_ecl)
-        nw_ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(nw_ecl)
 
         nw_model = tf.keras.Model(inputs, nw_ecl)
         return nw_model

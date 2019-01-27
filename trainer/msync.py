@@ -45,7 +45,7 @@ model_params = {'stft_window': 3200,
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 80,
+                'epochs': 50,
                 'steps_per_epoch': 25,
                 'val_steps': 25,
                 'metrics_range': [15360 // 1, 15360 // 2, 15360 // 4],
@@ -83,15 +83,15 @@ train_data, validation_data = dataset_interface.pipeline(params)
 msync_model = MSYNCModel(model_params=params)
 model = msync_model.build_model()
 model.summary()
+model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
+model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
+
 nw_model = msync_model.build_nw_model()
 nw_model.summary()
-nw_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
+nw_model.evaluate(validation_data, steps=100)
 
-try:
-    nw_model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
-finally:
-    if params.logdir.startswith('gs://'):
-        print('transferring model checkpoint hdf5 to bucket...')
-        with file_io.FileIO(checkpoint_file, mode='rb') as input_f:
-            with file_io.FileIO(os.path.join(params.logdir, logname + '/model-checkpoint.hdf5'), mode='w+') as output_f:
-                output_f.write(input_f.read())
+if params.logdir.startswith('gs://'):
+    print('transferring model checkpoint hdf5 to bucket...')
+    with file_io.FileIO(checkpoint_file, mode='rb') as input_f:
+        with file_io.FileIO(os.path.join(params.logdir, logname + '/model-checkpoint.hdf5'), mode='w+') as output_f:
+            output_f.write(input_f.read())
