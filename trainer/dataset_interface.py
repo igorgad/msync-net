@@ -155,11 +155,11 @@ def filter_nwin_less_sequential_bach(parsed_features, data_params):
 
 def random_select_frame(parsed_features, data_params):
     widx_max = tf.shape(parsed_features['signals'])[1]
-    widx = tf.random_uniform([data_params.num_examples], 0, widx_max, dtype=tf.int32)
+    widx = tf.random_uniform([1], 0, widx_max, dtype=tf.int32)[0]
 
     parsed_features['signals'] = tf.gather(parsed_features['signals'], widx, axis=1)
     parsed_features['activations'] = tf.gather(parsed_features['activations'], widx, axis=1)
-    parsed_features['signals'].set_shape([2, data_params.num_examples, data_params.example_length])
+    parsed_features['signals'].set_shape([2, data_params.example_length])
     return parsed_features
 
 
