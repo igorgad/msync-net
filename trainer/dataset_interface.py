@@ -1,9 +1,11 @@
+
 import tensorflow as tf
 import numpy as np
 import os
 import soundfile as sf
 import librosa
 import io
+import copy
 
 features = {'folder': tf.VarLenFeature(tf.string), 'is_train': tf.FixedLenFeature(1, tf.int64), 'files': tf.VarLenFeature(tf.string), 'instruments': tf.VarLenFeature(tf.string), 'types': tf.VarLenFeature(tf.string), 'activations': tf.VarLenFeature(tf.string)}
 
@@ -155,11 +157,11 @@ def filter_nwin_less_sequential_bach(parsed_features, data_params):
 
 def random_select_frame(parsed_features, data_params):
     widx_max = tf.shape(parsed_features['signals'])[1]
-    widx = tf.random_uniform([1], 0, widx_max, dtype=tf.int32)[0]
+    widx = tf.random_uniform([data_params.num_examples], 0, widx_max, dtype=tf.int32)
 
     parsed_features['signals'] = tf.gather(parsed_features['signals'], widx, axis=1)
     parsed_features['activations'] = tf.gather(parsed_features['activations'], widx, axis=1)
-    parsed_features['signals'].set_shape([2, data_params.example_length])
+    parsed_features['signals'].set_shape([2, data_params.num_examples, data_params.example_length])
     return parsed_features
 
 
@@ -168,7 +170,7 @@ def compute_one_hot_delay(parsed_features, data_params):
     middle_class = int_delay + data_params.example_length // 2 // data_params.stft_step
     range_class = tf.range(middle_class - data_params.labels_precision // data_params.stft_step // 2, 1 + middle_class + data_params.labels_precision // data_params.stft_step // 2)
     label = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
-    label = tf.nn.softmax(label)
+    label = tf.nn.softmax(4 * label)
     parsed_features['one_hot_delay'] = label
     return parsed_features
 
@@ -193,6 +195,15 @@ def select_val_examples(parsed_features):
     return tf.logical_not(parsed_features['is_train'])
 
 
+def resample_folds(parsed_features, data_params):
+    parsed_features['fold'] = tf.random_uniform([1], 0, data_params.num_folds, dtype=tf.int32, seed=data_params.split_seed)[0]
+    return parsed_features
+
+
+def select_folds(parsed_features, folds):
+    return tf.reduce_any(tf.equal(folds, parsed_features['fold']))
+
+
 def cached_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params.dataset_file)
     tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
@@ -210,6 +221,7 @@ def cached_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
     # tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
+    tfdataset = tfdataset.map(lambda feat: resample_folds(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.cache()
     return tfdataset
 
@@ -221,7 +233,6 @@ def base_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: random_select_frame(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
     return tfdataset
 
@@ -229,9 +240,37 @@ def base_pipeline(data_params):
 def pipeline(data_params):
     with tf.device('/cpu:0'):
         tfdataset = base_pipeline(data_params)
+        tfdataset = tfdataset.map(lambda feat: random_select_frame(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
+
         train_dataset = tfdataset.filter(select_train_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
         val_dataset = tfdataset.filter(select_val_examples).map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
 
         train_dataset = train_dataset.repeat().shuffle(16).batch(data_params.random_batch_size).prefetch(1)
         val_dataset = val_dataset.repeat().shuffle(16).batch(data_params.random_batch_size).prefetch(1)
     return train_dataset, val_dataset
+
+
+def kfold_pipeline(data_params, train_folds, val_folds, test_folds):
+    with tf.device('/cpu:0'):
+        tfdataset = base_pipeline(data_params)
+
+        train_dataset = tfdataset.filter(lambda feat: select_folds(feat, train_folds))
+        val_dataset = tfdataset.filter(lambda feat: select_folds(feat, val_folds))
+
+        train_dataset = train_dataset.map(lambda feat: random_select_frame(feat, data_params), num_parallel_calls=1)
+        val_dataset = val_dataset.map(lambda feat: random_select_frame(feat, data_params), num_parallel_calls=1)
+
+        train_dataset = train_dataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+        val_dataset = val_dataset.map(lambda feat: prepare_examples(feat, data_params), num_parallel_calls=4)
+
+        train_dataset = train_dataset.repeat().shuffle(16).batch(data_params.random_batch_size).prefetch(1)
+        val_dataset = val_dataset.repeat().shuffle(16).batch(data_params.random_batch_size).prefetch(1)
+
+        test_dataset = tfdataset.filter(lambda feat: select_folds(feat, test_folds))
+        test_params = copy.deepcopy(data_params)
+        test_params.num_examples = data_params.num_examples_test
+        test_params.random_batch_size = data_params.test_batch_size
+        test_dataset = test_dataset.map(lambda feat: random_select_frame(feat, test_params), num_parallel_calls=1)
+        test_dataset = test_dataset.map(lambda feat: prepare_examples(feat, test_params), num_parallel_calls=4)
+        test_dataset = test_dataset.repeat().shuffle(16).batch(test_params.test_batch_size).prefetch(1)
+    return train_dataset, val_dataset, test_dataset

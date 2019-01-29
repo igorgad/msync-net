@@ -1,4 +1,3 @@
-
 import tensorflow as tf
 
 
@@ -49,17 +48,18 @@ class MSYNCModel:
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
         ecl = DiagMean()(ecl)
-        ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
+        #         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model(inputs, ecl)
         return self.model
-
 
     def build_nw_model(self):
         model = self.model if self.model else self.build_model()
         inputs = tf.keras.Input(shape=(self.model_params.num_examples,) + self.input_shape, name='inputs')
         nw_ecl = tf.keras.layers.TimeDistributed(model, name='nw_ecl')(inputs)
         nw_ecl = tf.keras.layers.Lambda(lambda tensor: tf.reduce_mean(tensor, axis=1), name='nw_mean')(nw_ecl)
+        #         nw_ecl = DiagMean()(nw_ecl)
+        nw_ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(nw_ecl)
 
         nw_model = tf.keras.Model(inputs, nw_ecl)
         return nw_model
@@ -86,7 +86,7 @@ class LogMel(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=self.params.num_spectrogram_bins, sample_rate=self.params.sample_rate, lower_edge_hertz=self.params.lower_edge_hertz, upper_edge_hertz=self.params.upper_edge_hertz,
-            dtype=tf.float32, name=None)
+                                                                        dtype=tf.float32, name=None)
 
         super(LogMel, self).build(input_shape)  # Be sure to call this at the end
 

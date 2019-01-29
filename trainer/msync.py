@@ -49,7 +49,8 @@ train_params = {'lr': 1.0e-4,
                 'steps_per_epoch': 25,
                 'val_steps': 25,
                 'metrics_range': [15360 // 1, 15360 // 2, 15360 // 4],
-                'verbose': 1
+                'verbose': 1,
+                'num_folds': 5
                 }
 
 parser = argparse.ArgumentParser(description='Launch training session of msync-net.')
