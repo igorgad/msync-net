@@ -6,7 +6,7 @@ import numpy as np
 
 def contrastive_loss(y_true, y_pred):
     y_true = tf.logical_not(y_true)
-    with tf.device('/device:GPU:0'):
+    with tf.device('/device:CPU:0'):
         margin = 1.0
         loss = tf.reduce_mean(y_true * tf.square(y_pred) + (1 - y_true) * tf.square(tf.maximum(margin - y_pred, 0)))
     return loss

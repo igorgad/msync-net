@@ -170,14 +170,14 @@ def compute_one_hot_delay(parsed_features, data_params):
     middle_class = int_delay + data_params.example_length // 2 // data_params.stft_step
     range_class = tf.range(middle_class - data_params.labels_precision // data_params.stft_step // 2, 1 + middle_class + data_params.labels_precision // data_params.stft_step // 2)
     label = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
-    label = tf.nn.softmax(4 * label)
+    label = tf.nn.softmax(label)
     parsed_features['one_hot_delay'] = label
     return parsed_features
 
 
 def prepare_examples(parsed_features, data_params):
-    data = {'inputs': tf.stack([parsed_features['signals'][0], parsed_features['signals'][1]], axis=-1)}
-    labels = parsed_features['one_hot_delay']
+    data = {'inputs': tf.stop_gradient(tf.stack([parsed_features['signals'][0], parsed_features['signals'][1]], axis=-1))}
+    labels = tf.stop_gradient(parsed_features['one_hot_delay'])
     example = data, labels
     return example
 
@@ -226,8 +226,8 @@ def cached_pipeline(data_params):
     return tfdataset
 
 
-def base_pipeline(data_params):
-    tfdataset = cached_pipeline(data_params)
+def base_pipeline(data_params, tfdataset=None):
+    tfdataset = tfdataset if tfdataset else cached_pipeline(data_params)
     # tfdataset = tfdataset.repeat().shuffle(64)
 
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
@@ -250,9 +250,9 @@ def pipeline(data_params):
     return train_dataset, val_dataset
 
 
-def kfold_pipeline(data_params, train_folds, val_folds, test_folds):
+def kfold_pipeline(data_params, train_folds, val_folds, test_folds, tfdataset=None):
     with tf.device('/cpu:0'):
-        tfdataset = base_pipeline(data_params)
+        tfdataset = tfdataset if tfdataset else base_pipeline(data_params)
 
         train_dataset = tfdataset.filter(lambda feat: select_folds(feat, train_folds))
         val_dataset = tfdataset.filter(lambda feat: select_folds(feat, val_folds))

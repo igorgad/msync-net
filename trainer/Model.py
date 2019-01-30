@@ -47,18 +47,19 @@ class MSYNCModel:
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
-        ecl = DiagMean()(ecl)
-        #         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
+#         ecl = DiagMean()(ecl)
+#         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model(inputs, ecl)
         return self.model
 
-    def build_nw_model(self):
+    def build_nw_model(self, num_examples=0):
+        num_examples = num_examples if num_examples else self.model_params.num_examples
         model = self.model if self.model else self.build_model()
-        inputs = tf.keras.Input(shape=(self.model_params.num_examples,) + self.input_shape, name='inputs')
+        inputs = tf.keras.Input(shape=(num_examples,) + self.input_shape, name='inputs')
         nw_ecl = tf.keras.layers.TimeDistributed(model, name='nw_ecl')(inputs)
         nw_ecl = tf.keras.layers.Lambda(lambda tensor: tf.reduce_mean(tensor, axis=1), name='nw_mean')(nw_ecl)
-        #         nw_ecl = DiagMean()(nw_ecl)
+        nw_ecl = DiagMean()(nw_ecl)
         nw_ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(nw_ecl)
 
         nw_model = tf.keras.Model(inputs, nw_ecl)
