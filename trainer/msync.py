@@ -16,10 +16,10 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
-               'num_examples': 3,
+               'num_examples': 1,
                'max_delay': 2 * 15360,
                'labels_precision': 15360 // 1,
-               'random_batch_size': 12,
+               'random_batch_size': 8,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 3,

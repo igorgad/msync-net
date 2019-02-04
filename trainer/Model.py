@@ -1,4 +1,5 @@
 import tensorflow as tf
+import trainer.utils as utils
 
 
 class MSYNCModel:
@@ -47,8 +48,8 @@ class MSYNCModel:
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
-#         ecl = DiagMean()(ecl)
-#         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
+        #         ecl = DiagMean()(ecl)
+        #         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model(inputs, ecl)
         return self.model
@@ -64,6 +65,45 @@ class MSYNCModel:
 
         nw_model = tf.keras.Model(inputs, nw_ecl)
         return nw_model
+
+    def build_test_model(self, num_examples=0):
+        num_examples = num_examples if num_examples else self.model_params.num_examples
+        model = self.model if self.model else self.build_model()
+
+        inputs = tf.keras.Input(shape=(num_examples,) + self.input_shape, name='inputs')
+        nw_ecl = tf.keras.layers.TimeDistributed(model, name='nw_ecl')(inputs)
+        nw_ecl = tf.keras.layers.TimeDistributed(DiagMean(), name='diag_mean')(nw_ecl)
+        nw_ecl = ProbEstimation(n=5, bw=10.0)(nw_ecl)
+        nw_ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(nw_ecl)
+
+        self.test_model = tf.keras.Model(inputs, nw_ecl)
+        return self.test_model
+
+
+class ProbEstimation(tf.keras.layers.Layer):
+    def __init__(self, n=5, bw=2.0, **kwargs):
+        self.n = n
+        self.bw = bw
+        self.dist = None
+        super(ProbEstimation, self).__init__(**kwargs)
+
+    def call(self, inputs, *args, **kwargs):
+        tops = tf.map_fn(lambda t: utils.get_tops(tf.gather(inputs, t, axis=1), n=self.n).indices, tf.range(tf.shape(inputs)[1]), dtype=tf.int32)
+        flat_tops = tf.reshape(tops, [tf.shape(inputs)[0], -1])
+
+        batch_flat_tops_mat = tf.ones((tf.shape(inputs)[0], tf.shape(flat_tops)[1], tf.shape(inputs)[-1])) * tf.expand_dims(tf.cast(flat_tops, tf.float32), axis=-1)
+        batch_ntime_axis = tf.ones((tf.shape(inputs)[0], tf.shape(flat_tops)[1], tf.shape(inputs)[-1])) * tf.cast(tf.range(tf.shape(inputs)[-1]), tf.float32)
+
+        gaussian_mean = self.dist.prob(batch_ntime_axis - batch_flat_tops_mat)
+        gaussian_mean = tf.reduce_sum(gaussian_mean, axis=1)
+        return gaussian_mean
+
+    def build(self, input_shape):
+        self.dist = tf.contrib.distributions.Normal(0.0, self.bw)
+        super(ProbEstimation, self).build(input_shape)  # Be sure to call this at the end
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape((input_shape[0], input_shape[-1]))
 
 
 class LogMel(tf.keras.layers.Layer):

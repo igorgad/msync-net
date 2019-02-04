@@ -1,3 +1,4 @@
+
 import os
 import tensorflow as tf
 import numpy as np
@@ -14,12 +15,47 @@ dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB_v2.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
-data_params = {'sample_rate': 16000, 'example_length': 4 * 15360, 'num_examples': 3, 'num_examples_test': 8, 'max_delay': 2 * 15360, 'labels_precision': 15360 // 1, 'random_batch_size': 8, 'test_batch_size': 4, 'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar', 'split_seed': 3, 'split_rate': 0.8, 'debug_auto': False, 'scale_value': 1.0, 'limit_size_seconds': 1000, 'from_bucket': False}
+data_params = {'sample_rate': 16000,
+               'example_length': 4 * 15360,
+               'num_examples': 1,
+               'num_examples_test': 8,
+               'max_delay': 2 * 15360,
+               'labels_precision': 15360 // 1,
+               'random_batch_size': 8,
+               'test_batch_size': 2,
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
+               'split_seed': 3,
+               'split_rate': 0.8,
+               'debug_auto': False,
+               'scale_value': 1.0,
+               'limit_size_seconds': 1000,
+               'from_bucket': False
+               }
 
-model_params = {'stft_window': 3200, 'stft_step': 160, 'num_mel_bins': 256, 'num_spectrogram_bins': 2049, 'lower_edge_hertz': 125.0, 'upper_edge_hertz': 7500.0, 'encoder_units': [512, 256], 'top_units': [256, 128], 'dropout': 0.5, 'dmrn': False, 'residual_connection': False, 'culstm': True}
+model_params = {'stft_window': 3200,
+                'stft_step': 160,
+                'num_mel_bins': 256,
+                'num_spectrogram_bins': 2049,
+                'lower_edge_hertz': 125.0,
+                'upper_edge_hertz': 7500.0,
+                'encoder_units': [512, 256],
+                'top_units': [256, 128],
+                'dropout': 0.5,
+                'dmrn': False,
+                'residual_connection': False,
+                'culstm': True
+                }
 
-train_params = {'lr': 1.0e-4, 'epochs': 40, 'steps_per_epoch': 25, 'val_steps': 50, 'test_steps': 100, 'metrics_range': [15360 // 1, 15360 // 2, 15360 // 4], 'verbose': 2, 'num_folds': 5}
+train_params = {'lr': 1.0e-4,
+                'epochs': 50,
+                'steps_per_epoch': 25,
+                'val_steps': 50,
+                'test_steps': 100,
+                'metrics_range': [15360 // 1, 15360 // 2, 15360 // 4],
+                'verbose': 1,
+                'num_folds': 5
+                }
 
 parser = argparse.ArgumentParser(description='Launch training session of msync-net.')
 parser.add_argument('--logdir', type=str, default='logs/', help='The directory to store the experiments logs (default: logs/)')
@@ -64,7 +100,7 @@ for k in range(params.num_folds):
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
     model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
 
-    test_model = msync_model.build_nw_model(num_examples=params.num_examples_test)
+    test_model = msync_model.build_test_model(num_examples=params.num_examples_test)
     test_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
     test_acc = test_model.evaluate(test_data, steps=params.test_steps, verbose=2)
     test_hist.append(test_acc)

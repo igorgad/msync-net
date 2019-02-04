@@ -34,11 +34,7 @@ def absolute_range_categorical_accuracy(y_true, y_pred):
 def topn_range_categorical_accuracy(n, range=0):
     def internal_topn_range_categorical_accuracy(y_true, y_pred):
         with tf.device('/device:CPU:0'):
-            trail = tf.transpose(tf.map_fn(lambda i: zero_descent(y_pred, i), tf.range(1, tf.shape(y_pred)[-1]), dtype=tf.float32), [1, 0])
-            trail_rev = tf.reverse(trail, axis=[-1])
-            lead = tf.transpose(tf.map_fn(lambda i: zero_descent(trail_rev, i), tf.range(1, tf.shape(trail_rev)[-1]), dtype=tf.float32), [1, 0])
-            lead = tf.reverse(lead, axis=[-1])
-            tops = tf.math.top_k(lead, n)
+            tops = get_tops(y_pred, n)
             max_dist_index_pred = tf.map_fn(lambda i: tf.cast(tf.reduce_sum(tf.one_hot(i, tf.shape(y_pred)[-1]), axis=0), tf.bool), tops.indices, dtype=tf.bool)
 
             middle_vals = tf.map_fn(find_middle, y_true, dtype=tf.int64)
@@ -60,3 +56,12 @@ def zero_descent(signal, index):
 def find_middle(sig):
     true_idxs = tf.where(sig > 0.8 * tf.reduce_max(sig))[:, 0]
     return tf.gather(true_idxs, tf.shape(true_idxs)[-1] // 2, axis=-1)
+
+
+def get_tops(y_pred, n):
+    trail = tf.transpose(tf.map_fn(lambda i: zero_descent(y_pred, i), tf.range(1, tf.shape(y_pred)[-1]), dtype=tf.float32), [1, 0])
+    trail_rev = tf.reverse(trail, axis=[-1])
+    lead = tf.transpose(tf.map_fn(lambda i: zero_descent(trail_rev, i), tf.range(1, tf.shape(trail_rev)[-1]), dtype=tf.float32), [1, 0])
+    lead = tf.reverse(lead, axis=[-1])
+    tops = tf.math.top_k(lead, n)
+    return tops
