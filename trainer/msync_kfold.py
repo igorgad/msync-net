@@ -74,6 +74,7 @@ if params.logdir.startswith('gs://'):
 else:
     checkpoint_file = os.path.join(params.logdir, logname + '/model-checkpoint.hdf5')
 
+conf_mat = []
 fit_hist = []
 test_hist = []
 
@@ -98,12 +99,31 @@ for k in range(params.num_folds):
     model = msync_model.build_nw_model()
     model.summary()
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
-    model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
+    hist = model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
 
     test_model = msync_model.build_test_model(num_examples=params.num_examples_test)
-    test_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
-    test_acc = test_model.evaluate(test_data, steps=params.test_steps, verbose=2)
+    # test_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
+    test_example = test_data.make_one_shot_iterator().get_next()
+
+    res = test_model.predict(test_example[0])
+    top1_acc = utils.topn_range_categorical_accuracy(n=1, range=params.metrics_range[0])(test_example[1], res)
+    top5_acc = utils.topn_range_categorical_accuracy(n=1, range=params.metrics_range[0])(test_example[1], res)
+    confusion_matrix = tf.Variable(tf.zeros([385, 385], dtype=tf.int32), name='confusion_matrix', trainable=False)
+    confusion_batch = tf.confusion_matrix(labels=test_example[1], predictions=tes, num_classes=385)
+    confusion_matrix = tf.assign_add(confusion_matrix, confusion_batch)
+
+    sess = tf.keras.backend.get_session()
+    step_test_hist = []
+
+    tensorboard.on_epoch_begin(epoch=len(hist) + 1, logs=None)
+    for tsteps in range(params.test_steps):
+        step_top1_acc, step_top5_acc, cum_confusion_matrix = sess.run([top1_acc, top5_acc, confusion_matrix])
+        step_test_hist.append([step_top1_acc, step_top5_acc])
+
+    tensorboard.on_epoch_end(epoch=len(hist) + 1, logs=None)
+    test_acc = np.array(step_test_hist).mean(0)
     test_hist.append(test_acc)
+    conf_mat.append(cum_confusion_matrix)
 
     print('************************************************************************************')
     print('*************************************************** FOLD %d: %s' % (k, str(test_acc)))
@@ -117,8 +137,8 @@ for k in range(params.num_folds):
     del (model)
     del (test_model)
 
-top1_range_96 = np.array([k[1] for k in test_hist]).mean()
-top5_range_96 = np.array([k[4] for k in test_hist]).mean()
+top1_range_96 = np.array([k[0] for k in test_hist]).mean()
+top5_range_96 = np.array([k[1] for k in test_hist]).mean()
 
 print('************************************************************************************')
 print('************************************************** TOP1_RANGE_96: %f' % top1_range_96)
