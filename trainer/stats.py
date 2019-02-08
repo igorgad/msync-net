@@ -34,6 +34,16 @@ def create_inputs_plot(i1, i2):
     return fig
 
 
+@tfmpl.figure_tensor
+def draw_confusion_matrix(matrix):
+    fig = tfmpl.create_figure(figsize=(7, 7))
+    ax = fig.add_subplot(111)
+    ax.set_title('Confusion matrix')
+
+    tfmpl.plots.confusion_matrix.draw(ax, matrix, axis_labels=[str(x) for x in range(385)], normalize=True)
+    return fig
+
+
 class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
     def __init__(self, **kwargs):
         self.range = kwargs['range']

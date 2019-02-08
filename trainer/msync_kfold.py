@@ -66,7 +66,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master-mw-lstm-kfold/binloss-softout-latediagmean/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'master-mw-lstm-kfold/test_cmat/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)
@@ -101,29 +101,38 @@ for k in range(params.num_folds):
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
     hist = model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
 
-    test_model = msync_model.build_test_model(num_examples=params.num_examples_test)
+    test_model = msync_model.build_nw_model(num_examples=params.num_examples_test)
     # test_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
     test_example = test_data.make_one_shot_iterator().get_next()
 
-    res = test_model.predict(test_example[0])
+    res = test_model(test_example[0]['inputs'])
     top1_acc = utils.topn_range_categorical_accuracy(n=1, range=params.metrics_range[0])(test_example[1], res)
-    top5_acc = utils.topn_range_categorical_accuracy(n=1, range=params.metrics_range[0])(test_example[1], res)
-    confusion_matrix = tf.Variable(tf.zeros([385, 385], dtype=tf.int32), name='confusion_matrix', trainable=False)
-    confusion_batch = tf.confusion_matrix(labels=test_example[1], predictions=tes, num_classes=385)
-    confusion_matrix = tf.assign_add(confusion_matrix, confusion_batch)
+    top5_acc = utils.topn_range_categorical_accuracy(n=5, range=params.metrics_range[0])(test_example[1], res)
+    confusion_matrix = tf.Variable(tf.zeros([385, 385], dtype=tf.int32), trainable=False)
+    cmat_initializer = confusion_matrix.initializer
+
+    pred_tops = utils.get_tops(res, n=5).indices
+    label_val = tf.map_fn(lambda l: tf.cast(utils.find_middle(l), tf.int32), test_example[1], dtype=tf.int32)
+
+    full_indices = tf.reshape(tf.map_fn(lambda t: tf.stack([label_val, pred_tops[:, t]], axis=-1), tf.range(tf.shape(pred_tops)[-1]), dtype=tf.int32), [-1, 2])
+    confusion_matrix = tf.scatter_nd_add(confusion_matrix, full_indices, tf.ones(tf.shape(full_indices)[0], dtype=tf.int32))
+
+    confusion_image = tf.cast(tf.expand_dims(confusion_matrix, axis=-1), tf.float32)
+    confusion_image = tf.image.per_image_standardization(confusion_image)
+    confusion_image = tf.expand_dims(confusion_image, axis=0)
+    cmat_sum = tf.summary.image('confusion_matrix_k%d' % k, confusion_image)
 
     sess = tf.keras.backend.get_session()
-    step_test_hist = []
+    sess.run(cmat_initializer)
 
-    tensorboard.on_epoch_begin(epoch=len(hist) + 1, logs=None)
+    step_test_hist = []
     for tsteps in range(params.test_steps):
         step_top1_acc, step_top5_acc, cum_confusion_matrix = sess.run([top1_acc, top5_acc, confusion_matrix])
         step_test_hist.append([step_top1_acc, step_top5_acc])
 
-    tensorboard.on_epoch_end(epoch=len(hist) + 1, logs=None)
+    tensorboard.writer.add_summary(sess.run(cmat_sum), 0)
     test_acc = np.array(step_test_hist).mean(0)
     test_hist.append(test_acc)
-    conf_mat.append(cum_confusion_matrix)
 
     print('************************************************************************************')
     print('*************************************************** FOLD %d: %s' % (k, str(test_acc)))
