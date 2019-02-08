@@ -40,11 +40,12 @@ model_params = {'stft_window': 3200,
                 'dropout': 0.5,
                 'dmrn': False,
                 'residual_connection': False,
-                'culstm': True
+                'culstm': True,
+                'ghs_bw': 6.0
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 80,
+                'epochs': 30,
                 'steps_per_epoch': 25,
                 'val_steps': 25,
                 'metrics_range': [15360 // 1, 15360 // 2, 15360 // 4],
@@ -60,7 +61,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'bh-master-lstm/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'bh-lstm-rkhs/sig-nobw/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)

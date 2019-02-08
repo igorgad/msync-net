@@ -48,11 +48,33 @@ class MSYNCModel:
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
-        ecl = DiagMean()(ecl)
+#         ecl = GaussianActivation(bw=self.model_params.ghs_bw)(ecl)
+        ecl = tf.keras.layers.Activation('sigmoid')(ecl)
+        ecl = DiagMean(invert_output=True)(ecl)
         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model([v1_input, v2_input], ecl)
         return self.model
+
+    
+class GaussianActivation(tf.keras.layers.Layer):
+    def __init__(self, bw=2.0, **kwargs):
+        self.bw = bw
+        self.dist = None
+        super(GaussianActivation, self).__init__(**kwargs)
+
+    def call(self, inputs, *args, **kwargs):
+        ghs = self.dist.prob(inputs)
+        ghs = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), ghs)
+        tf.summary.image('ecl_ghs_mat', ghs)
+        return ghs
+
+    def build(self, input_shape):
+        self.dist = tf.contrib.distributions.Normal(0.0, self.bw)
+        super(GaussianActivation, self).build(input_shape)  # Be sure to call this at the end
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(input_shape)
 
 
 class LogMel(tf.keras.layers.Layer):
@@ -131,8 +153,9 @@ class EclDistanceMat(tf.keras.layers.Layer):
 
 
 class DiagMean(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, invert_output=True, **kwargs):
         self.mel_matrix = None
+        self.invert_output = invert_output
         super(DiagMean, self).__init__(**kwargs)
 
     def diag_mean(self, mat, diagi):
@@ -142,7 +165,8 @@ class DiagMean(tf.keras.layers.Layer):
         flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
         mean = tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
         centered_mean = mean - tf.reduce_mean(mean, axis=-1)
-        return -1 * centered_mean
+        centered_mean = -1 * centered_mean if self.invert_output else centered_mean
+        return centered_mean
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]
