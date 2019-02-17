@@ -18,8 +18,8 @@ data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
                'num_examples': 1,
                'max_delay': 2 * 15360,
-               'labels_precision': 15360 // 1,
-               'random_batch_size': 8,
+               'labels_precision': 0,
+               'random_batch_size': 16,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 3,
@@ -45,7 +45,7 @@ model_params = {'stft_window': 3200,
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 50,
+                'epochs': 30,
                 'steps_per_epoch': 25,
                 'val_steps': 50,
                 'metrics_range': [15360 // 1, 15360 // 2, 15360 // 4],
@@ -62,7 +62,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master-mw-lstm/dopo-kfold_catloss-softout-earlydiagmean/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'complete-master-lstm/single-fold/binloss/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)

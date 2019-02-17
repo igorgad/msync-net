@@ -7,7 +7,13 @@ import librosa
 import io
 import copy
 
-features = {'folder': tf.VarLenFeature(tf.string), 'is_train': tf.FixedLenFeature(1, tf.int64), 'files': tf.VarLenFeature(tf.string), 'instruments': tf.VarLenFeature(tf.string), 'types': tf.VarLenFeature(tf.string), 'activations': tf.VarLenFeature(tf.string)}
+features = {'folder': tf.VarLenFeature(tf.string), 
+            'is_train': tf.FixedLenFeature(1, tf.int64), 
+            'files': tf.VarLenFeature(tf.string), 
+            'instruments': tf.VarLenFeature(tf.string), 
+            'types': tf.VarLenFeature(tf.string), 
+            'activations': tf.VarLenFeature(tf.string)
+           }
 
 
 def is_empty(tensor):
@@ -166,12 +172,17 @@ def random_select_frame(parsed_features, data_params):
 
 
 def compute_one_hot_delay(parsed_features, data_params):
-    int_delay = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
-    middle_class = int_delay + data_params.example_length // 2 // data_params.stft_step
-    range_class = tf.range(middle_class - data_params.labels_precision // data_params.stft_step // 2, 1 + middle_class + data_params.labels_precision // data_params.stft_step // 2)
-    label = tf.reduce_sum(tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1), axis=0)
+    int_diff = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
+    label_diff = int_diff + data_params.example_length // 2 // data_params.stft_step
+    range_class = tf.range(label_diff - data_params.labels_precision // data_params.stft_step // 2, 1 + label_diff + data_params.labels_precision // data_params.stft_step // 2)
+
+    one_hot_label = 1.0 * tf.one_hot(label_diff, data_params.example_length // data_params.stft_step + 1)
+    one_hot_range = tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1)
+
+    label = tf.reduce_sum(tf.concat([one_hot_range, tf.expand_dims(one_hot_label, axis=0)], axis=0), axis=0)
     label = tf.nn.softmax(label)
     parsed_features['one_hot_delay'] = label
+    parsed_features['label_delay'] = label_diff
     return parsed_features
 
 

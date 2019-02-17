@@ -2,6 +2,9 @@
 import tensorflow as tf
 import numpy as np
 import tfmpl
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+
 
 
 @tfmpl.figure_tensor
@@ -12,8 +15,7 @@ def create_ave_image(ecl_distance, targets, range):
 
     ecl_curve = (ecl_curve - np.min(ecl_curve)) / (np.max(ecl_curve) - np.min(ecl_curve))
     target_curve = (target_curve - np.min(target_curve)) / (np.max(target_curve) - np.min(target_curve))
-    target_mid_true = np.where(target_curve > 0.8 * target_curve.max(-1))[0]
-    target_mid_true = target_mid_true[len(target_mid_true) // 2]
+    target_mid_true = np.argmax(target_curve)
 
     fig = tfmpl.create_figure(figsize=(4, 4))
     ax = fig.add_subplot(1, 1, 1)
@@ -36,11 +38,14 @@ def create_inputs_plot(i1, i2):
 
 @tfmpl.figure_tensor
 def draw_confusion_matrix(matrix):
-    fig = tfmpl.create_figure(figsize=(7, 7))
-    ax = fig.add_subplot(111)
+    fig = tfmpl.create_figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection='3d')
     ax.set_title('Confusion matrix')
 
-    tfmpl.plots.confusion_matrix.draw(ax, matrix, axis_labels=[str(x) for x in range(385)], normalize=True)
+    X = np.arange(0, matrix.shape[0], 1)
+    Y = np.arange(0, matrix.shape[1], 1)
+    X, Y = np.meshgrid(X, Y)
+    ax.plot_surface(X, Y, matrix, cmap=cm.coolwarm)
     return fig
 
 
@@ -60,3 +65,6 @@ class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
         # tf.summary.audio('input1_audio', i1_audio, 16000)
         # tf.summary.audio('input2_audio', i2_audio, 16000)
         # tf.summary.audio('mixed_audio', tf.reduce_mean(tf.concat([i1_audio, i2_audio], axis=-1), axis=-1), 16000)
+
+    def on_train_end(self, logs=None):
+        pass

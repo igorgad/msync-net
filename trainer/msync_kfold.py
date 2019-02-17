@@ -17,15 +17,15 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
-               'num_examples': 1,
+               'num_examples': 4,
                'num_examples_test': 8,
                'max_delay': 2 * 15360,
-               'labels_precision': 15360 // 1,
+               'labels_precision': 15360 // 8,
                'random_batch_size': 8,
-               'test_batch_size': 2,
+               'test_batch_size': 16,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
-               'split_seed': 3,
+               'split_seed': 0,
                'split_rate': 0.8,
                'debug_auto': False,
                'scale_value': 1.0,
@@ -48,12 +48,12 @@ model_params = {'stft_window': 3200,
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 50,
+                'epochs': 40,
                 'steps_per_epoch': 25,
-                'val_steps': 50,
-                'test_steps': 100,
+                'val_steps': 25,
+                'test_steps': 1000,
                 'metrics_range': [15360 // 1, 15360 // 2, 15360 // 4],
-                'verbose': 1,
+                'verbose': 2,
                 'num_folds': 5
                 }
 
@@ -66,7 +66,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = 'master-mw-lstm-kfold/test_cmat/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = 'complete-master-lstm/binloss_topnotch/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)
@@ -74,7 +74,7 @@ if params.logdir.startswith('gs://'):
 else:
     checkpoint_file = os.path.join(params.logdir, logname + '/model-checkpoint.hdf5')
 
-conf_mat = []
+conf_mat_hist = []
 fit_hist = []
 test_hist = []
 
@@ -106,33 +106,40 @@ for k in range(params.num_folds):
     test_example = test_data.make_one_shot_iterator().get_next()
 
     res = test_model(test_example[0]['inputs'])
-    top1_acc = utils.topn_range_categorical_accuracy(n=1, range=params.metrics_range[0])(test_example[1], res)
-    top5_acc = utils.topn_range_categorical_accuracy(n=5, range=params.metrics_range[0])(test_example[1], res)
-    confusion_matrix = tf.Variable(tf.zeros([385, 385], dtype=tf.int32), trainable=False)
-    cmat_initializer = confusion_matrix.initializer
+    with tf.device('/device:CPU:0'):
+        met = [m(test_example[1], res) for m in metrics]
+        cmats = [tf.Variable(tf.zeros([385, 385], dtype=tf.int32), trainable=False) for _ in [1, 5]]
+        cmats_initializer = [c.initializer for c in cmats]
 
-    pred_tops = utils.get_tops(res, n=5).indices
-    label_val = tf.map_fn(lambda l: tf.cast(utils.find_middle(l), tf.int32), test_example[1], dtype=tf.int32)
+        pred_tops = utils.get_tops(res, n=5).indices
+        label_val = tf.squeeze(tf.math.top_k(test_example[1], 1).indices)
 
-    full_indices = tf.reshape(tf.map_fn(lambda t: tf.stack([label_val, pred_tops[:, t]], axis=-1), tf.range(tf.shape(pred_tops)[-1]), dtype=tf.int32), [-1, 2])
-    confusion_matrix = tf.scatter_nd_add(confusion_matrix, full_indices, tf.ones(tf.shape(full_indices)[0], dtype=tf.int32))
-
-    confusion_image = tf.cast(tf.expand_dims(confusion_matrix, axis=-1), tf.float32)
-    confusion_image = tf.image.per_image_standardization(confusion_image)
-    confusion_image = tf.expand_dims(confusion_image, axis=0)
-    cmat_sum = tf.summary.image('confusion_matrix_k%d' % k, confusion_image)
+        full_indices = [tf.reshape(tf.map_fn(lambda t: tf.stack([label_val, pred_tops[:, t]], axis=-1), tf.range(n), dtype=tf.int32), [-1, 2]) for n in [1,5]]
+        cmats = [tf.scatter_nd_add(cm, fi, tf.ones(tf.shape(fi)[0], dtype=tf.int32)) for (cm, fi) in zip(cmats, full_indices)]
+        cmats_surface = [stats.draw_confusion_matrix(cm) for cm in cmats]
+        cmats_img = [tf.expand_dims(tf.expand_dims(tf.cast(cm / tf.reduce_max(cm), tf.float32), axis=-1), axis=0) for cm in cmats]
+        cmats_sum = tf.summary.merge([tf.summary.image('top%d_confusion_matrix_surface_k%d' % (n, k), cm) for (n, cm) in zip([1, 5], cmats_surface)] + [tf.summary.image('top%d_confusion_matrix_image_k%d' % (n, k), cm) for (n, cm) in zip([1, 5], cmats_img)])
 
     sess = tf.keras.backend.get_session()
-    sess.run(cmat_initializer)
+    sess.run(cmats_initializer)
 
     step_test_hist = []
     for tsteps in range(params.test_steps):
-        step_top1_acc, step_top5_acc, cum_confusion_matrix = sess.run([top1_acc, top5_acc, confusion_matrix])
-        step_test_hist.append([step_top1_acc, step_top5_acc])
+        rmet, cum_confusion_matrix = sess.run([met, cmats])
+        step_test_hist.append(rmet)
 
-    tensorboard.writer.add_summary(sess.run(cmat_sum), 0)
+    cum_confusion_matrix = np.array(cum_confusion_matrix)
+    np.save(os.path.join(params.logdir, logname + '/k%d/confusion_matrixes' % k), cum_confusion_matrix)
+    conf_mat_hist.append(cum_confusion_matrix)
+
     test_acc = np.array(step_test_hist).mean(0)
     test_hist.append(test_acc)
+    text_sum = tf.summary.text('test_metrics', tf.convert_to_tensor('FOLD %d: %s' % (k, str(test_acc))))
+
+    tensorboard.writer.add_summary(sess.run(cmats_sum))
+    tensorboard.writer.add_summary(sess.run(text_sum))
+    tensorboard.writer.flush()
+    tensorboard.writer.close()
 
     print('************************************************************************************')
     print('*************************************************** FOLD %d: %s' % (k, str(test_acc)))
@@ -146,10 +153,20 @@ for k in range(params.num_folds):
     del (model)
     del (test_model)
 
-top1_range_96 = np.array([k[0] for k in test_hist]).mean()
-top5_range_96 = np.array([k[1] for k in test_hist]).mean()
+sess = tf.keras.backend.get_session()
+all_metrics = np.array(test_hist).mean(0)
+text_sum = tf.summary.text('test_metrics', tf.convert_to_tensor('FINAL: %s' % str(all_metrics)))
+cmats = np.array(conf_mat_hist).mean(0)
+cmats_surface = [stats.draw_confusion_matrix(cm) for cm in cmats]
+cmats_img = [tf.expand_dims(tf.expand_dims(tf.cast(cm / tf.reduce_max(cm), tf.float32), axis=-1), axis=0) for cm in cmats]
+cmats_sum = tf.summary.merge([tf.summary.image('FINAL top%d_confusion_matrix_surface_k%d' % (n, k), cm) for (n, cm) in zip([1, 5], cmats_surface)] +
+                             [tf.summary.image('FINAL top%d_confusion_matrix_image_k%d' % (n, k), cm) for (n, cm) in zip([1, 5], cmats_img)])
+tensorboard.writer.reopen()
+tensorboard.writer.add_summary(sess.run(text_sum))
+tensorboard.writer.add_summary(sess.run(cmats_sum))
+tensorboard.writer.flush()
+tensorboard.writer.close()
 
 print('************************************************************************************')
-print('************************************************** TOP1_RANGE_96: %f' % top1_range_96)
-print('************************************************** TOP5_RANGE_96: %f' % top5_range_96)
+print('*********************************************** FINAL METRICS: %s' % str(all_metrics))
 print('************************************************************************************')

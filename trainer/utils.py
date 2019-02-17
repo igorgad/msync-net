@@ -37,7 +37,7 @@ def topn_range_categorical_accuracy(n, range=0):
             tops = get_tops(y_pred, n)
             max_dist_index_pred = tf.map_fn(lambda i: tf.cast(tf.reduce_sum(tf.one_hot(i, tf.shape(y_pred)[-1]), axis=0), tf.bool), tops.indices, dtype=tf.bool)
 
-            middle_vals = tf.map_fn(find_middle, y_true, dtype=tf.int64)
+            middle_vals = tf.squeeze(tf.math.top_k(y_true, 1).indices)
             max_dist_index_true = tf.map_fn(lambda val: tf.cast(tf.reduce_sum(tf.one_hot(tf.range(val - range // 2, 1 + val + range // 2), tf.shape(y_pred)[-1]), axis=0), tf.bool), middle_vals, dtype=tf.bool)
 
             range_acc = tf.reduce_any(tf.logical_and(max_dist_index_pred, max_dist_index_true), axis=1)
@@ -51,11 +51,6 @@ def topn_range_categorical_accuracy(n, range=0):
 
 def zero_descent(signal, index):
     return tf.where(tf.gather(signal, index - 1, axis=-1) < tf.gather(signal, index, axis=-1), tf.gather(signal, index, axis=-1), tf.zeros(tf.shape(signal)[0], dtype=tf.float32))
-
-
-def find_middle(sig):
-    true_idxs = tf.where(sig > 0.8 * tf.reduce_max(sig))[:, 0]
-    return tf.gather(true_idxs, tf.shape(true_idxs)[-1] // 2, axis=-1)
 
 
 def get_tops(y_pred, n):
