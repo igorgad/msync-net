@@ -48,8 +48,10 @@ class MSYNCModel:
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
-        #         ecl = DiagMean()(ecl)
-        #         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
+        ecl = GaussianActivation(bw=6.0, trainable=True)(ecl)
+#         ecl = tf.keras.layers.BatchNormalization()(ecl)
+#         ecl = DiagMean(invert_output=False)(ecl)
+#         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model(inputs, ecl)
         return self.model
@@ -60,7 +62,7 @@ class MSYNCModel:
         inputs = tf.keras.Input(shape=(num_examples,) + self.input_shape, name='inputs')
         nw_ecl = tf.keras.layers.TimeDistributed(model, name='nw_ecl')(inputs)
         nw_ecl = tf.keras.layers.Lambda(lambda tensor: tf.reduce_mean(tensor, axis=1), name='nw_mean')(nw_ecl)
-        nw_ecl = DiagMean()(nw_ecl)
+        nw_ecl = DiagMean(invert_output=False)(nw_ecl)
         nw_ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(nw_ecl)
 
         nw_model = tf.keras.Model(inputs, nw_ecl)
@@ -104,6 +106,29 @@ class ProbEstimation(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape((input_shape[0], input_shape[-1]))
+
+
+class GaussianActivation(tf.keras.layers.Layer):
+    def __init__(self, bw=2.0, **kwargs):
+        super(GaussianActivation, self).__init__(**kwargs)
+        self.bw = bw
+        self.dist = None
+
+    def call(self, inputs, *args, **kwargs):
+        dist = tf.contrib.distributions.Normal(0.0, self.bw[0])
+        ghs = dist.prob(inputs)
+        ghs = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), ghs)
+        tf.summary.image('ecl_ghs_mat', ghs)
+        tf.summary.scalar('kernel_bandwidth', self.bw[0])
+        return ghs
+
+    def build(self, input_shape):
+        self.bw = self.add_weight('bandwidth', shape=[1], dtype=tf.float32, initializer=tf.keras.initializers.constant(self.bw, dtype=tf.float32), trainable=self.trainable)
+        super(GaussianActivation, self).build(input_shape)  # Be sure to call this at the end
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(input_shape)
+
 
 
 class LogMel(tf.keras.layers.Layer):
@@ -182,8 +207,9 @@ class EclDistanceMat(tf.keras.layers.Layer):
 
 
 class DiagMean(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, invert_output=True, **kwargs):
         self.mel_matrix = None
+        self.invert_output = invert_output
         super(DiagMean, self).__init__(**kwargs)
 
     def diag_mean(self, mat, diagi):
@@ -193,7 +219,8 @@ class DiagMean(tf.keras.layers.Layer):
         flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
         mean = tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
         centered_mean = mean - tf.reduce_mean(mean, axis=-1)
-        return -1 * centered_mean
+        centered_mean = -1 * centered_mean if self.invert_output else centered_mean
+        return centered_mean
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]

@@ -49,6 +49,15 @@ def draw_confusion_matrix(matrix):
     return fig
 
 
+@tfmpl.figure_tensor
+def draw_histogram(values):
+    fig = tfmpl.create_figure(figsize=(8, 8))
+    ax = fig.add_subplot(111)
+    ax.set_title('Histogram')
+    ax.hist(values)
+    return fig
+
+
 class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
     def __init__(self, **kwargs):
         self.range = kwargs['range']
