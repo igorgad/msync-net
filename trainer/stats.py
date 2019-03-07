@@ -54,7 +54,7 @@ def draw_histogram(values):
     fig = tfmpl.create_figure(figsize=(8, 8))
     ax = fig.add_subplot(111)
     ax.set_title('Histogram')
-    ax.hist(values)
+    ax.hist(values, bins=769)
     return fig
 
 

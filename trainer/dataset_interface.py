@@ -176,7 +176,7 @@ def compute_one_hot_delay(parsed_features, data_params):
     label_diff = int_diff + data_params.example_length // 2 // data_params.stft_step
     range_class = tf.range(label_diff - data_params.labels_precision // data_params.stft_step // 2, 1 + label_diff + data_params.labels_precision // data_params.stft_step // 2)
 
-    one_hot_label = 0.1 * tf.one_hot(label_diff, data_params.example_length // data_params.stft_step + 1)
+    one_hot_label = 0.01 * tf.one_hot(label_diff, data_params.example_length // data_params.stft_step + 1)
     one_hot_range = tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1)
 
     label = tf.reduce_sum(tf.concat([one_hot_range, tf.expand_dims(one_hot_label, axis=0)], axis=0), axis=0)
@@ -188,6 +188,7 @@ def compute_one_hot_delay(parsed_features, data_params):
 
 def prepare_examples(parsed_features, data_params):
     parsed_features['signals'] = tf.squeeze(parsed_features['signals'])
+#     parsed_features['signals'] = parsed_features['signals'] + 0.2 * tf.reverse(parsed_features['signals'], axis=[0])
     data = {'inputs': tf.stop_gradient(tf.stack([parsed_features['signals'][0], parsed_features['signals'][1]], axis=-1))}
     labels = tf.stop_gradient(parsed_features['one_hot_delay'])
     example = data, labels

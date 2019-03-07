@@ -20,7 +20,7 @@ data_params = {'sample_rate': 16000,
                'num_examples': 4,
                'num_examples_test': 8,
                'max_delay': 2 * 15360,
-               'labels_precision': 15360 // 2,
+               'labels_precision': 15360 // 1,
                'random_batch_size': 8,
                'test_batch_size': 16,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
@@ -47,7 +47,7 @@ model_params = {'stft_window': 3200,
                 'culstm': True
                 }
 
-train_params = {'lr': 1.0e-4,
+train_params = {'lr': 1.0e-3,
                 'epochs': 40,
                 'steps_per_epoch': 25,
                 'val_steps': 25,
@@ -66,7 +66,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = '2master/kfold/binloss-gaussactivation-bw6/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = '2master-diagok/kfold/lrdiv08pat3/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)
@@ -91,7 +91,7 @@ for k in range(params.num_folds):
     # Set callbacks
     early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1, mode='auto')
     tensorboard = stats.TensorBoardAVE(log_dir=os.path.join(params.logdir, logname + '/k%d' % k), histogram_freq=0, batch_size=params.random_batch_size, write_images=True, range=params.metrics_range[0] // params.stft_step)
-    lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+    lr_reducer = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.8, patience=3, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
     callbacks = [tensorboard, lr_reducer, early_stop]
     metrics = [utils.topn_range_categorical_accuracy(n=n, range=range // params.stft_step) for n in [1, 5] for range in params.metrics_range]
     loss = tf.keras.losses.binary_crossentropy

@@ -48,7 +48,9 @@ class MSYNCModel:
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
 
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
-        ecl = GaussianActivation(bw=6.0, trainable=True)(ecl)
+#         ecl = AccumulateMatrix()(ecl)
+#         ecl = tf.keras.layers.ELU()(ecl)
+#         ecl = GaussianActivation(bw=6.0, trainable=True)(ecl)
 #         ecl = tf.keras.layers.BatchNormalization()(ecl)
 #         ecl = DiagMean(invert_output=False)(ecl)
 #         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
@@ -62,7 +64,7 @@ class MSYNCModel:
         inputs = tf.keras.Input(shape=(num_examples,) + self.input_shape, name='inputs')
         nw_ecl = tf.keras.layers.TimeDistributed(model, name='nw_ecl')(inputs)
         nw_ecl = tf.keras.layers.Lambda(lambda tensor: tf.reduce_mean(tensor, axis=1), name='nw_mean')(nw_ecl)
-        nw_ecl = DiagMean(invert_output=False)(nw_ecl)
+        nw_ecl = DiagMean(invert_output=True)(nw_ecl)
         nw_ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(nw_ecl)
 
         nw_model = tf.keras.Model(inputs, nw_ecl)
@@ -140,7 +142,9 @@ class LogMel(tf.keras.layers.Layer):
     def call(self, inputs, *args, **kwargs):
         inputs = tf.convert_to_tensor(inputs)
 
-        output = tf.abs(tf.contrib.signal.stft(inputs, self.params.stft_window, self.params.stft_step, pad_end=True))
+        stfts = tf.contrib.signal.stft(inputs, self.params.stft_window, self.params.stft_step, pad_end=True)
+#         output = tf.real(stfts * tf.conj(stfts))
+        output = tf.abs(stfts)
         output = tf.tensordot(output, self.mel_matrix, 1)
         output.set_shape(output.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
         output = tf.log(output + 0.01)
@@ -195,7 +199,7 @@ class EclDistanceMat(tf.keras.layers.Layer):
         mat = tf.map_fn(lambda ri: self.distance(tf.expand_dims(x[:, ri, :], axis=1), y[:, :, :]), tf.range(tf.shape(x)[1]), dtype=tf.float32)
         mat = tf.transpose(mat, [1, 0, 2, 3])
         mat.set_shape([inputs[0].shape[0], inputs[0].shape[1], inputs[1].shape[1], 1])
-        tf.summary.image('ecldist_mat', mat)
+        tf.summary.image('cost_mat', mat)
         return mat
 
     def build(self, input_shape):
@@ -204,6 +208,25 @@ class EclDistanceMat(tf.keras.layers.Layer):
     def compute_output_shape(self, input_shape):
         shape1, shape2 = input_shape
         return tf.TensorShape((shape1[0], shape1[1], shape2[1], 1))
+
+
+class AccumulateMatrix(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(AccumulateMatrix, self).__init__(**kwargs)
+
+    def call(self, inputs, *args, **kwargs):
+        cum_x = tf.math.cumsum(inputs, axis=1) + inputs
+        cum_y = tf.math.cumsum(inputs, axis=2) + inputs
+        cum_xy = cum_x + cum_y
+        mat = tf.reduce_min(tf.stack([cum_x, cum_y, cum_xy], axis=-1), axis = -1)
+        tf.summary.image('dtw_mat', mat)        
+        return mat
+
+    def build(self, input_shape):
+        super(AccumulateMatrix, self).build(input_shape)  # Be sure to call this at the end
+
+    def compute_output_shape(self, input_shape):
+        return tf.TensorShape(input_shape)
 
 
 class DiagMean(tf.keras.layers.Layer):
@@ -218,16 +241,16 @@ class DiagMean(tf.keras.layers.Layer):
         flat_indices = ny * tf.shape(mat)[1] + nx
         flat_mat = tf.reshape(mat, [tf.shape(mat)[0], -1])
         mean = tf.reduce_mean(tf.gather(flat_mat, flat_indices, axis=1), axis=1)
-        centered_mean = mean - tf.reduce_mean(mean, axis=-1)
-        centered_mean = -1 * centered_mean if self.invert_output else centered_mean
-        return centered_mean
+        return mean
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]
         mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps // 2, 1 + num_time_steps // 2), dtype=tf.float32)
         mean = tf.transpose(mean)
-        mean.set_shape([inputs.shape[0], inputs.shape[1] // 2 + inputs.shape[2] // 2 + 1])
-        return mean
+        centered_mean = mean - tf.reduce_mean(mean, axis=-1, keepdims=True)
+        centered_mean = -1 * centered_mean if self.invert_output else centered_mean
+        centered_mean.set_shape([inputs.shape[0], inputs.shape[1] // 2 + inputs.shape[2] // 2 + 1])
+        return centered_mean
 
     def build(self, input_shape):
         super(DiagMean, self).build(input_shape)  # Be sure to call this at the end
