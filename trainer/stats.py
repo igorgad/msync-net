@@ -21,7 +21,7 @@ def create_ave_image(ecl_distance, targets, range):
     ax = fig.add_subplot(1, 1, 1)
     ax.plot(np.arange(-ecl_distance.shape[1] //2 + 1, ecl_distance.shape[1] // 2 + 1), ecl_curve)
     ax.plot(np.arange(-ecl_distance.shape[1] // 2 + 1, ecl_distance.shape[1] // 2 + 1), target_curve)
-    # ax.axvline(np.argmax(targets[0, :]) - ecl_distance.shape[1] //2 + 1)
+#     ax.axvline(np.argmax(targets[0, :]) - ecl_distance.shape[1] //2 + 1, linestyle='--', color='g')
     ax.axvline(target_mid_true - range // 2 - ecl_distance.shape[1] //2, linestyle='--')
     ax.axvline(target_mid_true + range // 2 - ecl_distance.shape[1] //2 + 1, linestyle='--')
     return fig
@@ -54,7 +54,7 @@ def draw_histogram(values):
     fig = tfmpl.create_figure(figsize=(8, 8))
     ax = fig.add_subplot(111)
     ax.set_title('Histogram')
-    ax.hist(values, bins=769)
+    ax.hist(values, bins=769//4, density=True)
     return fig
 
 

@@ -12,9 +12,10 @@ class MSYNCModel:
         self.model_params = model_params
 
     def build_lstm_encoder_model(self, encoded, name=''):
-        lstm_cell = tf.keras.layers.CuDNNLSTM if self.model_params.culstm else tf.keras.layers.LSTM
+        lstm_cell = tf.keras.layers.CuDNNLSTM if self.model_params.rnn_cell == 'LSTM' else tf.keras.layers.CuDNNGRU
         for layer, units in enumerate(self.model_params.encoder_units):
             encoded = tf.keras.layers.Bidirectional(lstm_cell(units, return_sequences=True), name=name + 'lstm_encoder/lstm' + str(layer))(encoded)
+#             tf.keras.layers.Lambda(lambda feat: tf.summary.image('lstm_map_%d' % layer, tf.expand_dims(feat, axis=-1)), name=name + 'lstm_map_%d' % layer)(encoded)
         return encoded
 
     def build_top_model(self, encoded, name=''):
@@ -27,6 +28,7 @@ class MSYNCModel:
 
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params.top_units[-1]), name=name + 'fc_blockFinal/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_blockFinal/bn')(output)
+#         tf.keras.layers.Lambda(lambda feat: tf.summary.image('dense_map_%d' % layer, tf.expand_dims(feat, axis=-1)), name=name + 'dense_map_%d' % layer)(output)
         return output
 
     def build_model(self):
@@ -49,14 +51,13 @@ class MSYNCModel:
         if self.model_params.top_units:
             v1_encoded = self.build_top_model(v1_encoded, 'v1')
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
-
+            
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
-        ecl = KSoftDTW(gamma=1.0)(ecl)
-        ecl = CrossDiscrepancy(invert_output=True)(ecl)
-#         ecl = tf.keras.layers.ELU()(ecl)
 #         ecl = GaussianActivation(bw=6.0, trainable=True)(ecl)
-#         ecl = tf.keras.layers.BatchNormalization()(ecl)
-#         ecl = DiagMean(invert_output=False)(ecl)
+#         ecl = KSoftDTW(gamma=1.0)(ecl)        
+        
+        ecl = DiagMean(invert_output=True)(ecl)
+#         ecl = CrossDiscrepancy(invert_output=True)(ecl)
         ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
         self.model = tf.keras.Model(inputs, ecl)
@@ -136,7 +137,6 @@ class GaussianActivation(tf.keras.layers.Layer):
         return tf.TensorShape(input_shape)
 
 
-
 class LogMel(tf.keras.layers.Layer):
     def __init__(self, params, **kwargs):
         self.mel_matrix = None
@@ -196,7 +196,7 @@ class EclDistanceMat(tf.keras.layers.Layer):
         super(EclDistanceMat, self).__init__(**kwargs)
 
     def distance(self, x, y):
-        return tf.sqrt(tf.maximum(tf.norm(tf.pow(x - y, 2), axis=-1, keepdims=True), tf.keras.backend.epsilon()))
+        return tf.maximum(tf.norm(tf.pow(x - y, 2), axis=-1, keepdims=True), tf.keras.backend.epsilon())
 
     def call(self, inputs, *args, **kwargs):
         x, y = inputs
@@ -215,9 +215,9 @@ class EclDistanceMat(tf.keras.layers.Layer):
 
 
 class DiagMean(tf.keras.layers.Layer):
-    def __init__(self, invert_output=True, **kwargs):
-        self.mel_matrix = None
+    def __init__(self, invert_output=True, center_mean=True, **kwargs):
         self.invert_output = invert_output
+        self.center_mean = center_mean
         super(DiagMean, self).__init__(**kwargs)
 
     def diag_mean(self, mat, diagi):
@@ -230,12 +230,12 @@ class DiagMean(tf.keras.layers.Layer):
 
     def call(self, inputs, *args, **kwargs):
         num_time_steps = tf.shape(inputs)[1]
-        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps // 2, 1 + num_time_steps // 2), dtype=tf.float32)
+        mean = tf.map_fn(lambda ts: self.diag_mean(inputs, ts), tf.range(-num_time_steps // 2, 1 + num_time_steps // 2), dtype=tf.float32, parallel_iterations=32)
         mean = tf.transpose(mean)
-        centered_mean = mean - tf.reduce_mean(mean, axis=-1, keepdims=True)
-        centered_mean = -1 * centered_mean if self.invert_output else centered_mean
-        centered_mean.set_shape([inputs.shape[0], inputs.shape[1] // 2 + inputs.shape[2] // 2 + 1])
-        return centered_mean
+        mean = mean - tf.reduce_mean(mean, axis=-1, keepdims=True) if self.center_mean else mean
+        mean = -1 * mean if self.invert_output else mean
+        mean.set_shape([inputs.shape[0], inputs.shape[1] // 2 + inputs.shape[2] // 2 + 1])
+        return mean
 
     def build(self, input_shape):
         super(DiagMean, self).build(input_shape)  # Be sure to call this at the end
