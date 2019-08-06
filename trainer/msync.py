@@ -19,7 +19,7 @@ data_params = {'sample_rate': 16000,
                'num_examples': 1,
                'max_delay': 2 * 15360,
                'labels_precision': 15360 // 2,
-               'random_batch_size': 16,
+               'random_batch_size': 4,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
                'split_seed': 3,
@@ -62,7 +62,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = '2master/binloss-gaussactivation-bw10/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = '2master-diffdtw/binloss/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)
@@ -86,7 +86,6 @@ model = msync_model.build_model()
 model.summary()
 model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
 model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
-
 
 if params.logdir.startswith('gs://'):
     print('transferring model checkpoint hdf5 to bucket...')

@@ -61,19 +61,43 @@ def draw_histogram(values):
 class TensorBoardAVE(tf.keras.callbacks.TensorBoard):
     def __init__(self, **kwargs):
         self.range = kwargs['range']
+        self.kde_bw_sum = []
+        self.bw_step = 0
         kwargs.pop('range')
         super(TensorBoardAVE, self).__init__(**kwargs)
 
     def _make_histogram_ops(self, model):
-#         super(TensorBoardAVE, self)._make_histogram_ops(model)
-        tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('ecl_output').output, model.targets[0], self.range))
-        # tf.summary.image('input_plots', create_inputs_plot(model.inputs[0], model.inputs[1]))
+        #         super(TensorBoardAVE, self)._make_histogram_ops(model)
+        tf.summary.image('sequence_ecl_distance', create_ave_image(model.get_layer('ecl_output').output, model.targets[0], self.range))  # tf.summary.image('input_plots', create_inputs_plot(model.inputs[0], model.inputs[1]))
 
-        # i1_audio = tf.expand_dims(tf.reshape(model.inputs[0], [-1, 8 * 15360]), axis=-1)
-        # i2_audio = tf.expand_dims(tf.reshape(model.inputs[1], [-1, 8 * 15360]), axis=-1)
-        # tf.summary.audio('input1_audio', i1_audio, 16000)
-        # tf.summary.audio('input2_audio', i2_audio, 16000)
-        # tf.summary.audio('mixed_audio', tf.reduce_mean(tf.concat([i1_audio, i2_audio], axis=-1), axis=-1), 16000)
+        # i1_audio = tf.expand_dims(tf.reshape(model.inputs[0], [-1, 8 * 15360]), axis=-1)  # i2_audio = tf.expand_dims(tf.reshape(model.inputs[1], [-1, 8 * 15360]), axis=-1)  # tf.summary.audio('input1_audio', i1_audio, 16000)  # tf.summary.audio('input2_audio', i2_audio, 16000)  # tf.summary.audio('mixed_audio', tf.reduce_mean(tf.concat([i1_audio, i2_audio], axis=-1), axis=-1), 16000)
+
+    def on_train_begin(self, logs=None):
+        super(TensorBoardAVE, self).on_train_begin(logs)
+        self.sess = tf.keras.backend.get_session()
+        try:
+            self.kde_bw_sum.append(tf.summary.scalar('kde_bw', self.model.get_layer('kde_estimator').bw[0]))
+        except Exception as e:
+            print(str(e))
+            pass
+
+        try:
+            gbw = self.model.get_layer('nw_ecl').layer.get_layer('gaussian_activation').bw[0]
+            self.kde_bw_sum.append(tf.summary.scalar('gaussian_activation_bw', gbw))
+        except Exception as e:
+            print(str(e))
+            pass
+
+    def on_batch_end(self, batch, logs=None):
+        super(TensorBoardAVE, self).on_batch_end(batch, logs)
+        if self.kde_bw_sum:
+            merged = tf.summary.merge(self.kde_bw_sum)
+            self.writer.add_summary(self.sess.run(merged), self.bw_step)
+            self.bw_step += 1
+
+    def on_epoch_end(self, epoch, logs=None):
+        super(TensorBoardAVE, self).on_epoch_end(epoch, logs)
+        self.writer.flush()
 
     def on_train_end(self, logs=None):
         pass

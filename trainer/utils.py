@@ -49,14 +49,17 @@ def topn_range_categorical_accuracy(n, range=0):
     return func
 
 
-def zero_descent(signal, index):
-    return tf.where(tf.gather(signal, index - 1, axis=-1) < tf.gather(signal, index, axis=-1), tf.gather(signal, index, axis=-1), tf.zeros(tf.shape(signal)[0], dtype=tf.float32))
+def zero_descent(signal):
+    cut_trail = tf.where(tf.less(tf.gather(signal, tf.range(1, tf.shape(signal)[-1]), axis=-1), tf.gather(signal, tf.range(0, tf.shape(signal)[-1] - 1), axis=-1)),
+                         tf.zeros([tf.shape(signal)[0], tf.shape(signal)[-1] - 1], dtype=tf.float32),
+                         tf.gather(signal, tf.range(1, tf.shape(signal)[-1]), axis=-1))
+    return tf.concat([tf.zeros([tf.shape(cut_trail)[0], 1]), cut_trail], axis=-1)
 
 
 def get_tops(y_pred, n):
-    trail = tf.transpose(tf.map_fn(lambda i: zero_descent(y_pred, i), tf.range(1, tf.shape(y_pred)[-1]), dtype=tf.float32), [1, 0])
+    trail = zero_descent(y_pred)
     trail_rev = tf.reverse(trail, axis=[-1])
-    lead = tf.transpose(tf.map_fn(lambda i: zero_descent(trail_rev, i), tf.range(1, tf.shape(trail_rev)[-1]), dtype=tf.float32), [1, 0])
+    lead = zero_descent(trail_rev)
     lead = tf.reverse(lead, axis=[-1])
     tops = tf.math.top_k(lead, n)
     return tops

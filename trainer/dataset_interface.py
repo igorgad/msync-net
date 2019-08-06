@@ -78,6 +78,7 @@ def compute_activations(parsed_features, data_params):
         return np.array(lab)
 
     parsed_features['activations'] = tf.cond(is_empty(parsed_features['activations']), lambda: tf.ones_like(parsed_features['signals']), lambda: tf.py_func(func, [parsed_features['activations']], [tf.float32])[0])
+    parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(tf.shape(parsed_features['signals'])[-1], tf.shape(parsed_features['activations'])[-1])), axis=-1)
     return parsed_features
 
 
@@ -176,7 +177,7 @@ def compute_one_hot_delay(parsed_features, data_params):
     label_diff = int_diff + data_params.example_length // 2 // data_params.stft_step
     range_class = tf.range(label_diff - data_params.labels_precision // data_params.stft_step // 2, 1 + label_diff + data_params.labels_precision // data_params.stft_step // 2)
 
-    one_hot_label = 0.1 * tf.one_hot(label_diff, data_params.example_length // data_params.stft_step + 1)
+    one_hot_label = 1e-4 * tf.one_hot(label_diff, data_params.example_length // data_params.stft_step + 1)
     one_hot_range = tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1)
 
     label = tf.reduce_sum(tf.concat([one_hot_range, tf.expand_dims(one_hot_label, axis=0)], axis=0), axis=0)
@@ -186,8 +187,22 @@ def compute_one_hot_delay(parsed_features, data_params):
     return parsed_features
 
 
+def compute_gaus_delay(parsed_features, data_params):
+    int_diff = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
+    label_diff = int_diff + data_params.example_length // 2 // data_params.stft_step
+    range_class = tf.range(label_diff - data_params.labels_precision // data_params.stft_step // 2, 1 + label_diff + data_params.labels_precision // data_params.stft_step // 2)
+
+    dist = tf.contrib.distributions.Normal(0.0, data_params.bw)
+    label = dist.prob(tf.cast(tf.range(data_params.example_length // data_params.stft_step + 1) - label_diff, tf.float32))
+#     label = tf.nn.softmax(gdist)
+    parsed_features['one_hot_delay'] = label
+    parsed_features['label_delay'] = label_diff
+    return parsed_features
+
+
 def prepare_examples(parsed_features, data_params):
     parsed_features['signals'] = tf.squeeze(parsed_features['signals'])
+#     parsed_features['signals'] = parsed_features['signals'] + 0.2 * tf.reverse(parsed_features['signals'], axis=[0])
     data = {'inputs': tf.stop_gradient(tf.stack([parsed_features['signals'][0], parsed_features['signals'][1]], axis=-1))}
     labels = tf.stop_gradient(parsed_features['one_hot_delay'])
     example = data, labels
@@ -245,7 +260,8 @@ def base_pipeline(data_params, tfdataset=None):
     tfdataset = tfdataset.map(lambda feat: generate_delay_values(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: add_random_delay(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
+#     tfdataset = tfdataset.map(lambda feat: compute_one_hot_delay(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: compute_gaus_delay(feat, data_params), num_parallel_calls=4)
     return tfdataset
 
 

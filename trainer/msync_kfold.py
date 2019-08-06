@@ -17,8 +17,8 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
-               'num_examples': 4,
-               'num_examples_test': 8,
+               'num_examples': 1,
+               'num_examples_test': 1,
                'max_delay': 2 * 15360,
                'labels_precision': 15360 // 2,
                'random_batch_size': 8,
@@ -103,7 +103,8 @@ for k in range(params.num_folds):
     hist = model.fit(train_data, epochs=params.epochs, steps_per_epoch=params.steps_per_epoch, validation_data=validation_data, validation_steps=params.val_steps, callbacks=callbacks, verbose=params.verbose)
 
     test_model = msync_model.build_nw_model(num_examples=params.num_examples_test)
-    # test_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=params.lr), metrics=metrics)
+    test_model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(lr=1e-3), metrics=metrics)
+    test_model.fit(test_data, epochs=10, steps_per_epoch=25, verbose=1, callbacks=[stats.BWLogger])
     test_example = test_data.make_one_shot_iterator().get_next()
 
     res = test_model(test_example[0]['inputs'])

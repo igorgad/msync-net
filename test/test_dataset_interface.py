@@ -15,18 +15,20 @@ dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/M
 data_params = {'sample_rate': 16000,
                'example_length': 4 * 15360,
                'num_examples': 1,
-               'num_examples_test': 3,
+               'num_examples_test': 1,
                'max_delay': 2 * 15360,
-               'labels_precision': 0,
-               'random_batch_size': 16,
+               'labels_precision': 15360 // 2,
+               'random_batch_size': 8,
+               'test_batch_size': 16,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
                'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
-               'split_seed': 3,
+               'split_seed': 0,
                'split_rate': 0.8,
                'debug_auto': False,
                'scale_value': 1.0,
-               'limit_size_seconds': 1000,
-               'from_bucket': False
+               'limit_size_seconds': 60,
+               'from_bucket': False,
+               'bw': 1.0
                }
 
 model_params = {'stft_window': 3200,
@@ -72,13 +74,24 @@ val_folds = (k + 1) % params.num_folds
 train_folds = np.setdiff1d(np.arange(params.num_folds, dtype=np.int32), np.array([val_folds, test_folds]))
 
 
-train, val, test = dts.kfold_pipeline(params, train_folds, val_folds, test_folds)
+# train_dataset, val_dataset, test_dataset = dts.kfold_pipeline(params, train_folds, val_folds, test_folds)
 
+tfdataset = dts.base_pipeline(params).repeat()
+ex = tfdataset.make_one_shot_iterator().get_next()
+# r = sess.run(ex)
+d = []
+for s in range(10000):
+    try:
+        r = sess.run(ex)
+        d.append(r['label_delay'])
 
-#
+    except Exception as e:
+        print (str(e))
+        break
+
 # train_dataset = tfdataset.filter(dts.select_train_examples)
 # val_dataset = tfdataset.filter(dts.select_val_examples)
-#
+
 # nt = 0
 # nv = 0
 #
