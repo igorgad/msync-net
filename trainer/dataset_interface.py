@@ -6,6 +6,7 @@ import soundfile as sf
 import librosa
 import io
 import copy
+import ffmpeg
 
 features = {'folder': tf.VarLenFeature(tf.string), 
             'is_train': tf.FixedLenFeature(1, tf.int64), 
@@ -47,35 +48,30 @@ def select_instruments(parsed_features, data_params):
     return parsed_features
 
 
-def load_audio(parsed_features, data_params):
-    def load_file(file):
-        filename = os.fsencode(data_params.dataset_audio_dir) + b'/' + parsed_features['folder'] + b'/' + file
-        if data_params.from_bucket:
-            audio_binary = tf.py_func(lambda path: tf.gfile.Open(path, 'rb').read(), [filename], [tf.string])[0]
-        else:
-            audio_binary = tf.read_file(filename)
+def load_vbr(parsed_features, data_params):
+    def encode_and_probe(file):
+        file = os.fsencode(data_params.dataset_audio_dir) + b'/' + parsed_features['folder'] + b'/' + file
 
-        def decode_binary(binary):
-            info = sf.info(io.BytesIO(binary))
-            data, sr = sf.read(io.BytesIO(binary), dtype=np.float32, frames=data_params.limit_size_seconds * info.samplerate)
-            data = data.T
-            data = librosa.to_mono(data)
-            return librosa.resample(data, sr, data_params.sample_rate, res_type='kaiser_fast')
+        def ffmpeg_encode_and_probe(filename):
+            data, _ = ffmpeg.input(filename, t=data_params.limit_size_seconds)\
+                            .output('pipe:', format='flac', acodec='flac', frame_size=data_params.block_size, ac=1, ar=data_params.sample_rate)\
+                            .run(capture_stdout=True)
+            probe = ffmpeg.probe_bytes(data)
+            return np.array([int(frame['pkt_size']) for frame in probe['frames']]).astype(np.float32)
 
-        smp = tf.py_func(decode_binary, [audio_binary], [tf.float32])[0]
-        return smp
+        return tf.py_func(ffmpeg_encode_and_probe, [file], [tf.float32])[0]
 
-    parsed_features['signals'] = tf.map_fn(load_file, parsed_features['files'], dtype=tf.float32, infer_shape=False)
+    parsed_features['signals'] = tf.map_fn(encode_and_probe, parsed_features['files'], dtype=tf.float32, infer_shape=False)
     return parsed_features
 
 
-def compute_activations(parsed_features, data_params):
+def compute_activations_vbr(parsed_features, data_params):
     def func(labmat):
         dtime = np.diff(labmat[0])
         lab = []
         for b in range(1, labmat.shape[0]):
             lab.append(np.hstack([np.ones(int(dtime[i] / (1 / data_params.sample_rate)), np.float32) * labmat[b, i] for i in range(dtime.size)]))
-        return np.array(lab)
+        return np.array(lab) #[0:-1:data_params.block_size]
 
     parsed_features['activations'] = tf.cond(is_empty(parsed_features['activations']), lambda: tf.ones_like(parsed_features['signals']), lambda: tf.py_func(func, [parsed_features['activations']], [tf.float32])[0])
     parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(tf.shape(parsed_features['signals'])[-1], tf.shape(parsed_features['activations'])[-1])), axis=-1)
@@ -141,13 +137,6 @@ def frame_signals(parsed_features, data_params):
 def unframe_signals(parsed_features, data_params):
     parsed_features['signals'] = tf.reshape(parsed_features['signals'], [tf.shape(parsed_features['signals'])[0], -1])
     parsed_features['activations'] = tf.reshape(parsed_features['activations'], [tf.shape(parsed_features['activations'])[0], -1])
-    return parsed_features
-
-
-def limit_signal_size(parsed_features, data_params):
-    secs = data_params.limit_size_seconds
-    parsed_features['signals'] = tf.gather(parsed_features['signals'], tf.range(tf.minimum(secs * data_params.sample_rate, tf.shape(parsed_features['signals'])[-1])), axis=-1)
-    parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(secs * data_params.sample_rate, tf.shape(parsed_features['signals'])[-1])), axis=-1)
     return parsed_features
 
 
@@ -246,7 +235,6 @@ def cached_pipeline(data_params):
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: unframe_signals(feat, data_params), num_parallel_calls=4)
-    # tfdataset = tfdataset.map(lambda feat: limit_signal_size(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: resample_train_test(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.map(lambda feat: resample_folds(feat, data_params), num_parallel_calls=1)  # RANDOM, Must be non-parallel for deterministic behavior
     tfdataset = tfdataset.cache()

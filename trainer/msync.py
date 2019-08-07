@@ -27,16 +27,11 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False,
                'scale_value': 1.0,
                'limit_size_seconds': 1000,
-               'from_bucket': False
+               'from_bucket': False,
+               'block_size': 1024
                }
 
-model_params = {'stft_window': 3200,
-                'stft_step': 160,
-                'num_mel_bins': 256,
-                'num_spectrogram_bins': 2049,
-                'lower_edge_hertz': 125.0,
-                'upper_edge_hertz': 7500.0,
-                'encoder_units': [512, 256],
+model_params = {'encoder_units': [512, 256],
                 'top_units': [256, 128],
                 'dropout': 0.5,
                 'dmrn': False,
