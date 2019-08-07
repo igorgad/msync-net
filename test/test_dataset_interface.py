@@ -13,10 +13,10 @@ dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
 data_params = {'sample_rate': 16000,
-               'example_length': 4 * 15360,
+               'example_length': int(4 * 15360 / 1024),
                'num_examples': 1,
                'num_examples_test': 3,
-               'max_delay': 2 * 15360,
+               'max_delay': int(2 * 15360 / 1024),
                'labels_precision': 0,
                'random_batch_size': 16,
                'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
@@ -26,21 +26,18 @@ data_params = {'sample_rate': 16000,
                'debug_auto': False,
                'scale_value': 1.0,
                'limit_size_seconds': 1000,
-               'from_bucket': False
+               'from_bucket': False,
+               'block_size': 1024
                }
 
-model_params = {'stft_window': 3200,
-                'stft_step': 160,
-                'num_mel_bins': 256,
-                'num_spectrogram_bins': 2049,
-                'lower_edge_hertz': 125.0,
-                'upper_edge_hertz': 7500.0,
-                'encoder_units': [512, 256],
+model_params = {'encoder_units': [512, 256],
                 'top_units': [256, 128],
                 'dropout': 0.5,
                 'dmrn': False,
                 'residual_connection': False,
-                'culstm': True
+                'rnn_cell': 'LSTM',
+                'culstm': True,
+                'bw': 1.0
                 }
 
 train_params = {'lr': 1.0e-4,
@@ -66,41 +63,7 @@ config.gpu_options.allow_growth = True
 sess = tf.Session(config=config)
 sess.run(tf.global_variables_initializer())
 
-k = 1
-test_folds = k
-val_folds = (k + 1) % params.num_folds
-train_folds = np.setdiff1d(np.arange(params.num_folds, dtype=np.int32), np.array([val_folds, test_folds]))
+tfdataset = dts.base_pipeline(params)
+ex = tfdataset.make_one_shot_iterator().get_next()
 
-
-train, val, test = dts.kfold_pipeline(params, train_folds, val_folds, test_folds)
-
-
-#
-# train_dataset = tfdataset.filter(dts.select_train_examples)
-# val_dataset = tfdataset.filter(dts.select_val_examples)
-#
-# nt = 0
-# nv = 0
-#
-# ex = train_dataset.make_one_shot_iterator().get_next()
-# while True:
-#     try:
-#         r = sess.run(ex)
-#         nt += 1
-#
-#     except Exception as e:
-#         print (str(e))
-#         break
-#
-# ex = val_dataset.make_one_shot_iterator().get_next()
-# while True:
-#     try:
-#         r = sess.run(ex)
-#         nv += 1
-#
-#     except Exception as e:
-#         print (str(e))
-#         break
-#
-# print ('total: ' + str(nt + nv))
-# print ('train: ' + str(nt) + ', test: ' + str(nv))
+r = sess.run(ex)

@@ -35,11 +35,11 @@ class MSYNCModel:
         inputs = tf.keras.Input(shape=self.input_shape, name='inputs')
         v1_input, v2_input = tf.keras.layers.Lambda(lambda concat: tf.unstack(concat, axis=-1), name='inputs_unstack')(inputs)
 
-        v1_logmel = LogMel(params=self.model_params, name='v1logmel')(v1_input)
-        v2_logmel = LogMel(params=self.model_params, name='v2logmel')(v2_input)
+        v1_time_units = tf.keras.layers.Lambda(lambda ins: tf.expand_dims(ins, -1), name='v1time_units')(v1_input)
+        v2_time_units = tf.keras.layers.Lambda(lambda ins: tf.expand_dims(ins, -1), name='v2time_units')(v2_input)
 
-        v1_encoded = self.build_lstm_encoder_model(v1_logmel, 'v1')
-        v2_encoded = self.build_lstm_encoder_model(v2_logmel, 'v2')
+        v1_encoded = self.build_lstm_encoder_model(v1_time_units, 'v1')
+        v2_encoded = self.build_lstm_encoder_model(v2_time_units, 'v2')
 
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
@@ -135,37 +135,6 @@ class GaussianActivation(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         return tf.TensorShape(input_shape)
-
-
-class LogMel(tf.keras.layers.Layer):
-    def __init__(self, params, **kwargs):
-        self.mel_matrix = None
-        self.params = params
-        super(LogMel, self).__init__(**kwargs)
-
-    def call(self, inputs, *args, **kwargs):
-        inputs = tf.convert_to_tensor(inputs)
-
-        stfts = tf.contrib.signal.stft(inputs, self.params.stft_window, self.params.stft_step, pad_end=True)
-#         output = tf.real(stfts * tf.conj(stfts))
-        output = tf.abs(stfts)
-        output = tf.tensordot(output, self.mel_matrix, 1)
-        output.set_shape(output.shape[:-1].concatenate(self.mel_matrix.shape[-1:]))
-        output = tf.log(output + 0.01)
-        output = tf.expand_dims(output, -1)
-        output = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), output)
-        tf.summary.image('mel_log', output)
-        output = tf.squeeze(output, -1)
-        return output
-
-    def build(self, input_shape):
-        self.mel_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(num_mel_bins=self.params.num_mel_bins, num_spectrogram_bins=self.params.num_spectrogram_bins, sample_rate=self.params.sample_rate, lower_edge_hertz=self.params.lower_edge_hertz, upper_edge_hertz=self.params.upper_edge_hertz,
-                                                                        dtype=tf.float32, name=None)
-
-        super(LogMel, self).build(input_shape)  # Be sure to call this at the end
-
-    def compute_output_shape(self, input_shape):
-        return tf.TensorShape((input_shape[0], input_shape[1] // self.params.stft_step, self.params.num_mel_bins))
 
 
 class DMRNLayer(tf.keras.layers.Layer):

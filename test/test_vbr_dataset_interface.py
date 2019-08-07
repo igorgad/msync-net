@@ -61,7 +61,8 @@ tfdataset = tfdataset.map(lambda ex: dts.parse_features_and_decode(ex, dts.featu
 tfdataset = tfdataset.filter(lambda feat: dts.filter_instruments(feat, data_params))
 tfdataset = tfdataset.map(lambda feat: dts.select_instruments(feat, data_params), num_parallel_calls=4)
 tfdataset = tfdataset.map(lambda feat: dts.load_vbr(feat, data_params), num_parallel_calls=4)
-tfdataset = tfdataset.map(lambda feat: dts.compute_activations(feat, data_params), num_parallel_calls=4)
+tfdataset = tfdataset.map(lambda feat: dts.scale_signals(feat, data_params), num_parallel_calls=4)
+tfdataset = tfdataset.map(lambda feat: dts.compute_activations_vbr(feat, data_params), num_parallel_calls=4)
 ex = tfdataset.make_one_shot_iterator().get_next()
 
 sess = tf.Session()

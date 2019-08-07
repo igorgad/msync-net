@@ -7,6 +7,8 @@ import librosa
 import io
 import copy
 import ffmpeg
+import json
+import subprocess
 
 features = {'folder': tf.VarLenFeature(tf.string), 
             'is_train': tf.FixedLenFeature(1, tf.int64), 
@@ -19,6 +21,13 @@ features = {'folder': tf.VarLenFeature(tf.string),
 
 def is_empty(tensor):
     return tf.equal(tf.size(tensor), 0)
+
+
+def probe_bytes(bytes, cmd='ffprobe'):
+    args = [cmd, '-show_format', '-show_streams', '-show_frames', '-of', 'json', '-i', 'pipe:']
+    p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out = p.communicate(input=bytes)[0]
+    return json.loads(out.decode('utf-8'))
 
 
 def parse_features_and_decode(tf_example, features):
@@ -55,8 +64,8 @@ def load_vbr(parsed_features, data_params):
         def ffmpeg_encode_and_probe(filename):
             data, _ = ffmpeg.input(filename, t=data_params.limit_size_seconds)\
                             .output('pipe:', format='flac', acodec='flac', frame_size=data_params.block_size, ac=1, ar=data_params.sample_rate)\
-                            .run(capture_stdout=True)
-            probe = ffmpeg.probe_bytes(data)
+                            .run(capture_stdout=True, quiet=True)
+            probe = probe_bytes(data)
             return np.array([int(frame['pkt_size']) for frame in probe['frames']]).astype(np.float32)
 
         return tf.py_func(ffmpeg_encode_and_probe, [file], [tf.float32])[0]
@@ -70,8 +79,9 @@ def compute_activations_vbr(parsed_features, data_params):
         dtime = np.diff(labmat[0])
         lab = []
         for b in range(1, labmat.shape[0]):
-            lab.append(np.hstack([np.ones(int(dtime[i] / (1 / data_params.sample_rate)), np.float32) * labmat[b, i] for i in range(dtime.size)]))
-        return np.array(lab) #[0:-1:data_params.block_size]
+            dec_act = np.hstack([np.ones(int(dtime[i] / (1 / data_params.sample_rate)), np.float32) * labmat[b, i] for i in range(dtime.size)])
+            lab.append(dec_act[::data_params.block_size])
+        return np.array(lab)
 
     parsed_features['activations'] = tf.cond(is_empty(parsed_features['activations']), lambda: tf.ones_like(parsed_features['signals']), lambda: tf.py_func(func, [parsed_features['activations']], [tf.float32])[0])
     parsed_features['activations'] = tf.gather(parsed_features['activations'], tf.range(tf.minimum(tf.shape(parsed_features['signals'])[-1], tf.shape(parsed_features['activations'])[-1])), axis=-1)
@@ -162,12 +172,12 @@ def random_select_frame(parsed_features, data_params):
 
 
 def compute_one_hot_delay(parsed_features, data_params):
-    int_diff = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
-    label_diff = int_diff + data_params.example_length // 2 // data_params.stft_step
-    range_class = tf.range(label_diff - data_params.labels_precision // data_params.stft_step // 2, 1 + label_diff + data_params.labels_precision // data_params.stft_step // 2)
+    int_diff = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0])), tf.int32)
+    label_diff = int_diff + data_params.example_length // 2
+    range_class = tf.range(label_diff - data_params.labels_precision // 2, 1 + label_diff + data_params.labels_precision // 2)
 
-    one_hot_label = 1e-4 * tf.one_hot(label_diff, data_params.example_length // data_params.stft_step + 1)
-    one_hot_range = tf.one_hot(range_class, data_params.example_length // data_params.stft_step + 1)
+    one_hot_label = 1e-4 * tf.one_hot(label_diff, data_params.example_length + 1)
+    one_hot_range = tf.one_hot(range_class, data_params.example_length + 1)
 
     label = tf.reduce_sum(tf.concat([one_hot_range, tf.expand_dims(one_hot_label, axis=0)], axis=0), axis=0)
     label = tf.nn.softmax(label)
@@ -177,12 +187,12 @@ def compute_one_hot_delay(parsed_features, data_params):
 
 
 def compute_gaus_delay(parsed_features, data_params):
-    int_diff = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0]) / data_params.stft_step), tf.int32)
-    label_diff = int_diff + data_params.example_length // 2 // data_params.stft_step
-    range_class = tf.range(label_diff - data_params.labels_precision // data_params.stft_step // 2, 1 + label_diff + data_params.labels_precision // data_params.stft_step // 2)
+    int_diff = tf.cast(tf.round((parsed_features['delay'][1] - parsed_features['delay'][0])), tf.int32)
+    label_diff = int_diff + data_params.example_length // 2
+    range_class = tf.range(label_diff - data_params.labels_precision // 2, 1 + label_diff + data_params.labels_precision // 2)
 
     dist = tf.contrib.distributions.Normal(0.0, data_params.bw)
-    label = dist.prob(tf.cast(tf.range(data_params.example_length // data_params.stft_step + 1) - label_diff, tf.float32))
+    label = dist.prob(tf.cast(tf.range(data_params.example_length + 1) - label_diff, tf.float32))
 #     label = tf.nn.softmax(gdist)
     parsed_features['one_hot_delay'] = label
     parsed_features['label_delay'] = label_diff
@@ -190,7 +200,7 @@ def compute_gaus_delay(parsed_features, data_params):
 
 
 def prepare_examples(parsed_features, data_params):
-#     parsed_features['signals'] = tf.squeeze(parsed_features['signals'])
+    parsed_features['signals'] = tf.squeeze(parsed_features['signals'])
 #     parsed_features['signals'] = parsed_features['signals'] + 0.2 * tf.reverse(parsed_features['signals'], axis=[0])
     data = {'inputs': tf.stop_gradient(tf.stack([parsed_features['signals'][0], parsed_features['signals'][1]], axis=-1))}
     labels = tf.stop_gradient(parsed_features['one_hot_delay'])
@@ -225,12 +235,12 @@ def cached_pipeline(data_params):
     tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
     tfdataset = tfdataset.filter(lambda feat: filter_instruments(feat, data_params))
     tfdataset = tfdataset.map(lambda feat: select_instruments(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: load_audio(feat, data_params), num_parallel_calls=4)
-    tfdataset = tfdataset.map(lambda feat: compute_activations(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: load_vbr(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.map(lambda feat: compute_activations_vbr(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: mix_similar_instruments(feat, data_params), num_parallel_calls=4)
     if data_params.debug_auto:
         tfdataset = tfdataset.map(lambda feat: copy_v0_to_vall(feat), num_parallel_calls=4)  # USED FOR DEBUG ONLY
-    tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: frame_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: remove_non_active_frames(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.filter(lambda feat: filter_nwin_less_sequential_bach(feat, data_params))
