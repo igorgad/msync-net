@@ -2,7 +2,6 @@
 import numpy as np
 import tensorflow as tf
 import trainer.utils as utils
-from sdtw import SoftDTW
 
 
 class MSYNCModel:
@@ -18,16 +17,31 @@ class MSYNCModel:
 #             tf.keras.layers.Lambda(lambda feat: tf.summary.image('lstm_map_%d' % layer, tf.expand_dims(feat, axis=-1)), name=name + 'lstm_map_%d' % layer)(encoded)
         return encoded
 
+    def build_cnn_encoder_model(self, encoded, name=''):
+        for layer, units in enumerate(self.model_params.encoder_units):
+            encoded = tf.keras.layers.Conv1D(filters=units, kernel_size=8-layer, activation='relu', padding='same', name=name + 'cnn_encoder/cnn' + str(layer))(encoded)
+#             encoded = tf.keras.layers.BatchNormalization(name=name + 'cnn_encoder/bn' + str(layer))(encoded)
+#             encoded = tf.keras.layers.ELU(name=name + 'cnn_encoder/elu' + str(layer))(encoded)
+        return encoded
+
+    def build_post_ecl_model(self, encoded, name='post_ecl'):
+        for layer, units in enumerate(self.model_params.post_ecl_units):
+            encoded = tf.keras.layers.Conv2D(filters=units, kernel_size=[5-layer, 5-layer], activation='relu', padding='same', name=name + '/conv' + str(layer))(encoded)
+            if self.model_params.post_ecl_pooling:
+                encoded = tf.keras.layers.MaxPooling2D(pool_size=(2, 2), strides=None, padding='same', name=name + '/pooling' + str(layer))(encoded)
+            encoded = tf.keras.layers.BatchNormalization(name=name + '/bn' + str(layer))(encoded)
+        return encoded
+
     def build_top_model(self, encoded, name=''):
         output = encoded
         for layer, units in enumerate(self.model_params.top_units[:-1]):
-            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units), name=name + 'fc_block%d/fc' % layer)(output)
+            output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units, activation='relu'), name=name + 'fc_block%d/fc' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_block%d/bn' % layer)(output)
-            output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block%d/elu' % layer)(output)
+#             output = tf.keras.layers.TimeDistributed(tf.keras.layers.ELU(), name=name + 'fc_block%d/elu' % layer)(output)
             output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(self.model_params.dropout), name=name + 'fc_block%d/dropout' % layer)(output)
 
-        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params.top_units[-1]), name=name + 'fc_blockFinal/fc')(output)
         output = tf.keras.layers.TimeDistributed(tf.keras.layers.BatchNormalization(), name=name + 'fc_blockFinal/bn')(output)
+        output = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.model_params.top_units[-1]), name=name + 'fc_blockFinal/fc')(output)
 #         tf.keras.layers.Lambda(lambda feat: tf.summary.image('dense_map_%d' % layer, tf.expand_dims(feat, axis=-1)), name=name + 'dense_map_%d' % layer)(output)
         return output
 
@@ -35,11 +49,12 @@ class MSYNCModel:
         inputs = tf.keras.Input(shape=self.input_shape, name='inputs')
         v1_input, v2_input = tf.keras.layers.Lambda(lambda concat: tf.unstack(concat, axis=-1), name='inputs_unstack')(inputs)
 
-        v1_time_units = tf.keras.layers.Lambda(lambda ins: tf.expand_dims(ins, -1), name='v1time_units')(v1_input)
-        v2_time_units = tf.keras.layers.Lambda(lambda ins: tf.expand_dims(ins, -1), name='v2time_units')(v2_input)
+        v1_encoded = tf.keras.layers.Lambda(lambda ins: tf.expand_dims(ins, -1), name='v1time_units')(v1_input)
+        v2_encoded = tf.keras.layers.Lambda(lambda ins: tf.expand_dims(ins, -1), name='v2time_units')(v2_input)
 
-        v1_encoded = self.build_lstm_encoder_model(v1_time_units, 'v1')
-        v2_encoded = self.build_lstm_encoder_model(v2_time_units, 'v2')
+        if self.model_params.encoder_units:
+            v1_encoded = self.build_lstm_encoder_model(v1_encoded, 'v1') if self.model_params.encoder_type == 'lstm' else self.build_cnn_encoder_model(v1_encoded, 'v1')
+            v2_encoded = self.build_lstm_encoder_model(v2_encoded, 'v2') if self.model_params.encoder_type == 'lstm' else self.build_cnn_encoder_model(v2_encoded, 'v2')
 
         if self.model_params.dmrn:
             v1_encoded, v2_encoded = DMRNLayer()([v1_encoded, v2_encoded])
@@ -53,13 +68,21 @@ class MSYNCModel:
             v2_encoded = self.build_top_model(v2_encoded, 'v2')
             
         ecl = EclDistanceMat()([v1_encoded, v2_encoded])
-#         ecl = GaussianActivation(bw=6.0, trainable=True)(ecl)
-#         ecl = KSoftDTW(gamma=1.0)(ecl)        
-        
-        ecl = DiagMean(invert_output=True)(ecl)
-#         ecl = CrossDiscrepancy(invert_output=True)(ecl)
-        ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
 
+        if self.model_params.post_ecl_units:
+            ecl = self.build_post_ecl_model(ecl)
+            
+        if self.model_params.ecl_end_strategy == 'diag_mean':
+            ecl = tf.keras.layers.Lambda(lambda feat: tf.reduce_mean(feat, axis=-1, keep_dims=True), name='ecl_feat_mean')(ecl)
+            ecl = DiagMean(invert_output=True)(ecl)
+
+        if self.model_params.ecl_end_strategy == 'dense':
+            ecl = tf.keras.layers.Flatten(name='final_ecl/flatten')(ecl)
+            ecl = tf.keras.layers.Dense(1024, activation='relu', name='final_ecl/dense0')(ecl)
+            ecl = tf.keras.layers.Dropout(self.model_params.dropout, name='final_ecl/dropout')(ecl)
+            ecl = tf.keras.layers.Dense(self.input_shape[0] // 2 + self.input_shape[0] // 2 + 1, activation='linear', name='final_ecl/final_dense')(ecl)
+        
+        ecl = tf.keras.layers.Activation('softmax', name='ecl_output')(ecl)
         self.model = tf.keras.Model(inputs, ecl)
         return self.model
 

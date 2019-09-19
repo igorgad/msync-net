@@ -14,25 +14,34 @@ dataset = 'medleydb'
 dataset_file = './data/BACH10/MSYNC-bach10.tfrecord' if dataset == 'bach10' else './data/MedleyDB/MSYNC-MedleyDB_v2.tfrecord'
 dataset_audio_root = './data/BACH10/Audio' if dataset == 'bach10' else './data/MedleyDB/Audio'
 
-data_params = {'sample_rate': 44100,
-               'example_length': int(4 * 15360 / 1024),
+sample_rate = 44100
+block_size = 1024
+
+data_params = {'sample_rate': sample_rate,
+               'example_length': int(4 * sample_rate / block_size),
                'num_examples': 1,
-               'max_delay': int(2 * 15360 / 1024),
-               'labels_precision': 15360 // 1,
+               'max_delay': int(2 * sample_rate / block_size),
+               'labels_precision': sample_rate // 1,
                'random_batch_size': 16,
-               'instrument_1': 'bassoon' if dataset == 'bach10' else 'electric bass',
-               'instrument_2': 'clarinet' if dataset == 'bach10' else 'clean electric guitar',
+               'instrument_1': 'bassoon' if dataset == 'bach10' else 'drum set',  #'electric bass',
+               'instrument_2': 'clarinet' if dataset == 'bach10' else 'electric bass',  #'clean electric guitar',
+               'type_1': 'brass',
+               'type_2': 'strings',
                'split_seed': 3,
                'split_rate': 0.8,
                'debug_auto': False,
                'scale_value': 1.0,
                'limit_size_seconds': 1000,
                'from_bucket': False,
-               'block_size': 1024
+               'block_size': block_size
                }
 
-model_params = {'encoder_units': [512, 256],
-                'top_units': [256, 128],
+model_params = {'encoder_type': 'cnn',
+                'encoder_units': [128, 256, 512],
+                'top_units': [128],
+                'post_ecl_units': [],
+                'post_ecl_pooling': False,
+                'ecl_end_strategy': 'diag_mean', #or diag_mean
                 'dropout': 0.5,
                 'dmrn': False,
                 'residual_connection': False,
@@ -42,10 +51,12 @@ model_params = {'encoder_units': [512, 256],
                 }
 
 train_params = {'lr': 1.0e-4,
-                'epochs': 30,
-                'steps_per_epoch': 25,
+                'epochs': 50,
+                'steps_per_epoch': 50,
                 'val_steps': 50,
-                'metrics_range': [15360 // 1 // data_params['block_size'], 15360 // 2 // data_params['block_size'], 15360 // 4 // data_params['block_size']],
+                'metrics_range': [sample_rate // 1 // block_size, 
+                                  sample_rate // 2 // block_size, 
+                                  sample_rate // 4 // block_size],
                 'verbose': 1,
                 'num_folds': 5
                 }
@@ -59,7 +70,7 @@ parser.add_argument('--dataset_audio_dir', type=str, default=dataset_audio_root,
 [parser.add_argument('--%s' % key, type=type(val), help='%s' % val, default=val) for key, val in data_params.items()]
 
 params = parser.parse_known_args()[0]
-logname = '3master-VBR/single-fold/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
+logname = '3master-VBR/single-fold/cnn-allrelu-v2/bw1/llr-plateau05-patience4/typefilt-rndtype/' + ''.join(['%s=%s/' % (key, str(val).replace('/', '').replace(' ', '').replace('gs:', '')) for key, val in sorted(list(params.__dict__.items()))]) + 'run'
 
 if params.logdir.startswith('gs://'):
     os.system('mkdir -p %s' % logname)

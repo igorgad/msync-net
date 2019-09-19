@@ -57,6 +57,25 @@ def select_instruments(parsed_features, data_params):
     return parsed_features
 
 
+def filter_types(parsed_features, data_params):
+    return tf.logical_and(tf.reduce_any(tf.equal(parsed_features['types'], data_params.type_1)), tf.reduce_any(tf.equal(parsed_features['types'], data_params.type_2)))
+
+
+def random_select_types(parsed_features, data_params):
+    i1_index = tf.where(tf.equal(parsed_features['types'], data_params.type_1))[:, 0]
+    i2_index = tf.where(tf.equal(parsed_features['types'], data_params.type_2))[:, 0]
+
+    i1_index = tf.gather(i1_index, tf.random_uniform([1], 0, tf.shape(i1_index)[0], dtype=tf.int32), axis=0)
+    i2_index = tf.gather(i2_index, tf.random_uniform([1], 0, tf.shape(i2_index)[0], dtype=tf.int32), axis=0)
+    idx = tf.concat([i1_index, i2_index], axis=0)
+
+    parsed_features['files'] = tf.map_fn(lambda i: tf.gather(parsed_features['files'], i, axis=0), idx, dtype=tf.string)
+    parsed_features['instruments'] = tf.map_fn(lambda i: tf.gather(parsed_features['instruments'], i, axis=0), idx, dtype=tf.string)
+    parsed_features['types'] = tf.map_fn(lambda i: tf.gather(parsed_features['types'], i, axis=0), idx, dtype=tf.string)
+    parsed_features['activations'] = tf.map_fn(lambda i: tf.gather(parsed_features['activations'], i, axis=0), tf.concat([[0], i1_index + 1, i2_index + 1], axis=0), dtype=tf.float32)
+    return parsed_features
+
+
 def load_vbr(parsed_features, data_params):
     def encode_and_probe(file):
         file = os.fsencode(data_params.dataset_audio_dir) + b'/' + parsed_features['folder'] + b'/' + file
@@ -233,8 +252,10 @@ def select_folds(parsed_features, folds):
 def cached_pipeline(data_params):
     tfdataset = tf.data.TFRecordDataset(data_params.dataset_file)
     tfdataset = tfdataset.map(lambda ex: parse_features_and_decode(ex, features))
-    tfdataset = tfdataset.filter(lambda feat: filter_instruments(feat, data_params))
-    tfdataset = tfdataset.map(lambda feat: select_instruments(feat, data_params), num_parallel_calls=4)
+#     tfdataset = tfdataset.filter(lambda feat: filter_instruments(feat, data_params))
+#     tfdataset = tfdataset.map(lambda feat: select_instruments(feat, data_params), num_parallel_calls=4)
+    tfdataset = tfdataset.filter(lambda feat: filter_types(feat, data_params))
+    tfdataset = tfdataset.map(lambda feat: random_select_types(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: load_vbr(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: scale_signals(feat, data_params), num_parallel_calls=4)
     tfdataset = tfdataset.map(lambda feat: compute_activations_vbr(feat, data_params), num_parallel_calls=4)
